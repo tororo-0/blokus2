@@ -35,12 +35,30 @@ const get_turn_text = (turn) => {
 }
 
 /**
+ * ターンのカラーを返します
+ */
+const get_turn_color = (turn) => {
+    switch (turn) {
+        case "r":
+            return "red"
+        case "b":
+           return "blue"
+        case "g":
+            return "green"
+        case "y":
+           return "yellow"
+    }
+}
+
+/**
  * 現在のターン表示を更新します
  */
 const display_update_turn = (turn) => {
     const turn_text = document.querySelector('.turn-color');
-    if (turn_text) {
+    const turn_box = document.querySelector('.turn-box');
+    if (turn_text && turn_box) {
         turn_text.textContent = get_turn_text(turn);
+        turn_box.style.backgroundColor = get_turn_color(turn);
     }
 }
 /**
