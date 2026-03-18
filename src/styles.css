@@ -14,6 +14,10 @@ body {
    justify-content: center;
 }
 
+.turn-area {
+   font-size: 40px;
+}
+
 #board { 
    border-collapse: collapse;
 }
