@@ -52,8 +52,13 @@ body {
    min-height: 80px; 
  
 }
-button { 
-   padding: 4px 12px; 
-   margin: 2px; 
+.game-button { 
+   /* padding: 4px 12px;  */
+   margin: 1px; 
    cursor: pointer; 
+   background-color: #f5f5f5;
+   border-color: #000000;
+   border-radius: 4px;
+   height: 70px;
+   width: 70px;
 }
