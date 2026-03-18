@@ -204,7 +204,7 @@ function render(){ renderBoard(); renderPieces(); }
 function doRotate(){
   if(G.selId===null) return;
   G.rot=(G.rot+1)%4;
-  render();
+  renderBoard();
 }
 document.addEventListener('keydown',e=>{ if(e.key==='r'||e.key==='R') doRotate(); });
 
