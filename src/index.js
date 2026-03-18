@@ -243,6 +243,31 @@ function doPass(){
   nextTurn();
 }
 
+function validCheck() {
+  const p = G.cur;  
+  if (G.passed[p] || G.remain[p].length === 0) return;
+  let canPlace = false;
+  outer:
+  for (const id of G.remain[p]) {
+    for (let rot = 0; rot < 4; rot++) {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const pcs = getPlaced(r, c, id, rot);
+          if (pcs.some(([pr, pc]) => pr < 0 || pr >= SIZE || pc < 0 || pc >= SIZE)) continue;
+          if (isValid(p, pcs)) {
+            canPlace = true;
+            break outer;
+          }
+        }
+      }
+    }
+  }
+
+  if (!canPlace) {
+    dbg(NAMES[p] + ' は置ける場所がないため自動でパスしました');
+    doPass();
+  }
+}
 
 //ターン送り
 function nextTurn(){
@@ -255,6 +280,7 @@ function nextTurn(){
   G.hoverR=-1; G.hoverC=-1;
   G.selId=null; G.rot=0;
   render();
+  validCheck();
 }
 
 
