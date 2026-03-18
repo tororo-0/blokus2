@@ -36,7 +36,7 @@ body {
 #board td.bad { background: #727272 !important; opacity: 1; }
 #board td.corner { outline: 3px dashed #555555; outline-offset: -3px; }
 
-#pieces { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; transform: scale(1.5);}
+#pieces { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; transform: scale(1.5);}
 .pbtn { cursor: pointer; border: 2px solid #aaaaaa; padding: 4px; background: #ffffff;}
 .pbtn.sel { border: 3px solid #000000; }
 .pbtn table { border-collapse: collapse; }
