@@ -34,13 +34,15 @@ body {
 #board td.p4 { background: #ff9800; }
 #board td.pre { opacity: 0.4; }
 #board td.bad { background: #727272 !important; opacity: 1; }
-#board td.corner { outline: 3px dashed #555555; outline-offset: -3px; }
-
-#pieces { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; transform: scale(1.5);}
-.pbtn { cursor: pointer; border: 2px solid #aaaaaa; padding: 4px; background: #ffffff;}
+#board td.corner1 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(230, 57, 70, 40%);}
+#board td.corner2 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(33, 150, 243, 40%);}
+#board td.corner3 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(76, 175, 80, 40%);}
+#board td.corner4 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(255, 152, 0, 40%);}
+#pieces { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; transform: scale(2);}
+.pbtn { cursor: pointer; border: none; padding: 4px; background: fixed;}
 .pbtn.sel { border: 3px solid #000000; }
 .pbtn table { border-collapse: collapse; }
-.pbtn td { width: 13px; height: 13px; border: 1px solid #dddddd; }
+.pbtn td { width: 13px; height: 13px; border: 1px solid #f5f5f5; }
 
 #debug { 
    margin-top: 8px; 

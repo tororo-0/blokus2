@@ -125,7 +125,9 @@ const cells2d = []; // cells2d[r][c] = td要素
       //ホバー　仕様を理解していないのでこれ以上触らない
       td.addEventListener('mouseenter', ()=>{
         G.hoverR=r; G.hoverC=c;
-        renderBoard();
+        if (G.selId) {
+            renderBoard();        
+        }
       });
 
       //右クリックで回転
@@ -144,6 +146,7 @@ const cells2d = []; // cells2d[r][c] = td要素
 
 //ボードだけ再描画（DOMは壊さない）
 function renderBoard(){
+    console.log('load');
   let pre=[], preOk=false;
   if(G.selId!==null && G.hoverR>=0){
     pre   = getPlaced(G.hoverR,G.hoverC,G.selId,G.rot);
@@ -166,7 +169,14 @@ function renderBoard(){
         td.className='p'+G.board[r][c];
       } else {
         for(let p=1;p<=4;p++){
-          if(G.first[p]&&CORNERS[p][0]===r&&CORNERS[p][1]===c) td.className='corner';
+          if(G.first[p]&&CORNERS[p][0]===r&&CORNERS[p][1]===c) {
+            switch(p) {
+                case 1: td.className='corner1'; break;
+                case 2: td.className='corner2'; break;
+                case 3: td.className='corner3'; break;
+                case 4: td.className='corner4'; break;
+            }
+          };
         }
       }
     }
