@@ -38,7 +38,7 @@ body {
 #board td.corner2 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(33, 150, 243, 40%);}
 #board td.corner3 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(76, 175, 80, 40%);}
 #board td.corner4 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(255, 152, 0, 40%);}
-#pieces { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; transform: scale(2);}
+#pieces { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; transform: scale(1);}
 .pbtn { cursor: pointer; border: none; padding: 4px; background: fixed;}
 .pbtn.sel { border: 3px solid #000000; }
 .pbtn table { border-collapse: collapse; }
