@@ -293,6 +293,7 @@ function showResult(){
   }
   const order=[1,2,3,4].sort((a,b)=>sc[b]-sc[a]);
   alert('ゲーム終了!\n\n'+order.map((p,i)=>`${i+1}位: ${NAMES[p]} (${sc[p]}マス)`).join('\n'));
+  location.reload();
 }
 
 render();
