@@ -41,6 +41,7 @@ const G = {
   first:  {1:true,2:true,3:true,4:true},
   passed: {1:false,2:false,3:false,4:false},
   cur: 1, selId: null, rot: 0, hoverR: -1, hoverC: -1,
+  lastPiece: {1:null, 2:null, 3:null, 4:null},
 };
 
 //デバックメッセージ表示
@@ -118,6 +119,7 @@ const cells2d = []; // cells2d[r][c] = td要素
         G.first[G.cur]=false;
         const idx=G.remain[G.cur].indexOf(G.selId);
         if(idx!==-1) G.remain[G.cur].splice(idx,1);
+        G.lastPiece[G.cur]=G.selId;
         G.selId=null; G.rot=0;
         nextTurn();
       });
@@ -283,16 +285,30 @@ function nextTurn(){
 }
 
 
-//採点　一旦アラートで表示
+///採点　一旦アラートで表示
 function showResult(){
   const sc={};
   for(let p=1;p<=4;p++){//ピース数変更後は注意
-    let n=0;
-    for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++) if(G.board[r][c]===p) n++;
-    sc[p]=n;
+
+    let remainCells=0;
+    let score=0;
+    for(const id of G.remain[p]){
+      remainCells += PDEFS[id].length;
+    }
+
+    score -= remainCells;
+
+    if(G.remain[p].length === 0){
+      score += 15;
+      if(G.lastPiece[p] === 0){
+        score += 5;
+      }
+    }
+
+    sc[p]=score;
   }
   const order=[1,2,3,4].sort((a,b)=>sc[b]-sc[a]);
-  alert('ゲーム終了!\n\n'+order.map((p,i)=>`${i+1}位: ${NAMES[p]} (${sc[p]}マス)`).join('\n'));
+  alert('ゲーム終了!\n\n'+order.map((p,i)=>`${i+1}位: ${NAMES[p]} (${sc[p]}ポイント)`).join('\n'));
   location.reload();
 }
 
