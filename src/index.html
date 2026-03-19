@@ -1,12 +1,28 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <title>Document</title>
+<meta charset="UTF-8">
+<title>Blokus Base</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    
+
+<div class="game-area">
+    <div class="turn-area">
+        <b id="tlabel">赤プレイヤー</b>のターン
+
+        <button class="game-button" onclick="doRotate()">回転(R)</button>
+        <!-- <button class="game-button" onclick="doPass()">パス</button> -->
+    </div>
+
+
+    <table id="board"></table>
+
+    <div id="pieces"></div>
+</div>
+    <div id="debug">操作ログ</div>
+
+
+<script src="index.js"></script>
 </body>
 </html>
