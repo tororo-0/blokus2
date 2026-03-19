@@ -125,7 +125,7 @@ const cells2d = []; // cells2d[r][c] = td要素
       //ホバー　仕様を理解していないのでこれ以上触らない
       td.addEventListener('mouseenter', ()=>{
         G.hoverR=r; G.hoverC=c;
-        if (G.selId) {
+        if (G.selId !== null) {
             renderBoard();        
         }
       });
@@ -145,8 +145,7 @@ const cells2d = []; // cells2d[r][c] = td要素
 
 
 //ボードだけ再描画（DOMは壊さない）
-function renderBoard(){
-    console.log('load');
+function renderBoard() {
   let pre=[], preOk=false;
   if(G.selId!==null && G.hoverR>=0){
     pre   = getPlaced(G.hoverR,G.hoverC,G.selId,G.rot);
