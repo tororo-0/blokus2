@@ -40,7 +40,7 @@ const G = {
   remain: {1:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],2:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],3:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],4:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]},  //remainはピースの数を増やしたらその数追加する
   first:  {1:true,2:true,3:true,4:true},
   passed: {1:false,2:false,3:false,4:false},
-  cur: 1, selId: null, rot: 0, hoverR: -1, hoverC: -1,
+  cur: 1, selId: null, rot: 0, hoverR: -1, hoverC: -1,flip:false,
   lastPiece: {1:null, 2:null, 3:null, 4:null},
 };
 
@@ -51,6 +51,11 @@ function dbg(s){ document.getElementById('debug').textContent = s; }
 //ピース変換
 function getShape(id, r){
   let cs = PDEFS[id].map(c=>[...c]);
+   if(G.flip){
+    cs = cs.map(([r,c]) => [r,-c]);
+    const mc =Math.min(...cs.map(([,c])=>c));
+    cs = cs.map(([r,c])=>[r,c-mc]);
+  }
   for(let i=0;i<r;i++){
     cs = cs.map(([r,c])=>[c,-r]);
     const mr=Math.min(...cs.map(([r])=>r));
@@ -238,6 +243,15 @@ function doRotate(){
 document.addEventListener('keydown',e=>{ if(e.key==='r'||e.key==='R') doRotate(); });
 
 
+//反転
+function doFlip(){
+  if(G.selId===null) return;
+  G.flip = !G.flip //trueとfalseの切り替え用
+  renderBoard();
+}
+document.addEventListener('keydown',e=>{ if(e.key==='f'||e.key==='F') doFlip(); });
+
+
 //パス
 function doPass(){
   G.passed[G.cur]=true;
@@ -279,7 +293,7 @@ function nextTurn(){
     if(!G.passed[G.cur]&&G.remain[G.cur].length>0) break;
   }
   G.hoverR=-1; G.hoverC=-1;
-  G.selId=null; G.rot=0;
+  G.selId=null; G.rot=0;G.flip=false;
   render();
   validCheck();
 }
