@@ -48,10 +48,11 @@ const G = {
   roomId: null, mySeat: null, isHost: false,
 };
 
-let zoom = 1;
+let zoom = 0.6; //デフォルトの表示倍率
+let seatsCache = {}; //ロビーの席状況（COM判定などで使う）
 
-//デバックメッセージ表示
-function dbg(s){ document.getElementById('debug').textContent = s; }
+//デバッグメッセージ（画面には出さず、開発者ツールのConsoleにのみ出力）
+function dbg(s){ console.log(s); }
 
 
 /* =========================================================
@@ -101,16 +102,29 @@ function enterRoom(code){
   document.getElementById('roomCodeDisplay').textContent = code;
 
   db.ref('rooms/'+code+'/seats').on('value', snap=>{
-    renderSeats(snap.val() || {});
+    seatsCache = snap.val() || {};
+    renderSeats(seatsCache);
   });
 
   db.ref('rooms/'+code+'/status').on('value', snap=>{
-    if(snap.val() === 'playing'){
+    const st = snap.val();
+    G.roomStatus = st;
+    if(st === 'playing'){
       document.getElementById('lobby').style.display = 'none';
       document.getElementById('gameArea').style.display = '';
+      setZoom(zoom);
       subscribeGameState();
+    } else if(st === 'finished'){
+      showResult();
     }
   });
+}
+
+function isCOM(p){ return seatsCache[p] === 'COM'; }
+
+//空席をCPUに設定する（ホストのみ操作可能）
+function setSeatCOM(p){
+  db.ref('rooms/'+G.roomId+'/seats/'+p).set('COM');
 }
 
 function renderSeats(seats){
@@ -118,18 +132,37 @@ function renderSeats(seats){
   wrap.innerHTML = '';
   let takenCount = 0;
   for(let p=1;p<=4;p++){
-    const taken = !!seats[p];
+    const val = seats[p];
+    const taken = !!val;
     if(taken) takenCount++;
+
+    const row = document.createElement('div');
+    row.className = 'seat-row';
+
     const btn = document.createElement('button');
     btn.className = 'seat-btn' + (G.mySeat===p ? ' mine' : '');
     btn.style.borderColor = COLORS[p];
-    btn.textContent = NAMES[p] + '：' + (taken ? seats[p] + (G.mySeat===p?'（あなた）':'') : '（空席・タップで参加）');
+    let label = NAMES[p] + '：';
+    if(val === 'COM') label += '（CPU）';
+    else if(taken) label += val + (G.mySeat===p?'（あなた）':'');
+    else label += '（空席・タップで参加）';
+    btn.textContent = label;
     if(taken){
       btn.disabled = true;
     } else {
       btn.addEventListener('click', ()=>claimSeat(p));
     }
-    wrap.appendChild(btn);
+    row.appendChild(btn);
+
+    if(!taken && G.isHost){
+      const comBtn = document.createElement('button');
+      comBtn.className = 'com-btn';
+      comBtn.textContent = 'CPUにする';
+      comBtn.addEventListener('click', ()=>setSeatCOM(p));
+      row.appendChild(comBtn);
+    }
+
+    wrap.appendChild(row);
   }
   document.getElementById('startBtn').style.display = (G.isHost && takenCount>0) ? '' : 'none';
 }
@@ -187,6 +220,7 @@ function subscribeGameState(){
     seatEl.style.color = G.mySeat ? COLORS[G.mySeat] : '';
 
     render();
+    maybeRunCOM();
   });
 }
 
@@ -197,6 +231,14 @@ function syncState(){
     board: G.board, remain: G.remain, first: G.first, passed: G.passed,
     active: G.active, cur: G.cur, lastPiece: G.lastPiece
   });
+}
+
+//ゲームを途中終了する（誰でも押せる）
+function endGame(){
+  if(!confirm('ゲームを終了しますか？（現在の手持ちピースで採点されます）')) return;
+  if(G.roomId){
+    db.ref('rooms/'+G.roomId+'/status').set('finished');
+  }
 }
 
 
@@ -467,7 +509,11 @@ function validCheck() {
 //ターン送り（active=trueの席だけを対象にする）
 function nextTurn(){
   const allDone=[1,2,3,4].every(p=>!G.active[p]||G.passed[p]||G.remain[p].length===0);
-  if(allDone){ syncState(); showResult(); return; }
+  if(allDone){
+    syncState();
+    if(G.roomId) db.ref('rooms/'+G.roomId+'/status').set('finished');
+    return;
+  }
   for(let i=1;i<=4;i++){
     G.cur=(G.cur%4)+1;
     if(G.active[G.cur]&&!G.passed[G.cur]&&G.remain[G.cur].length>0) break;
@@ -477,6 +523,53 @@ function nextTurn(){
   syncState();
   render();
   validCheck();
+}
+
+
+/* =========================================================
+   CPU（COM）の自動着手
+   置ける手の中から見つかった最初の手を置くだけの簡易ロジック。
+   ホストのブラウザだけが実行する（複数端末が同時に着手するのを防ぐため）。
+   ========================================================= */
+
+function findAnyValidMove(p){
+  for(const id of G.remain[p]){
+    for(let rot=0; rot<4; rot++){
+      for(let r=0;r<SIZE;r++){
+        for(let c=0;c<SIZE;c++){
+          const pcs = getPlaced(r,c,id,rot);
+          if(pcs.some(([pr,pc])=>pr<0||pr>=SIZE||pc<0||pc>=SIZE)) continue;
+          if(isValid(p,pcs)) return {id,rot,r,c};
+        }
+      }
+    }
+  }
+  return null;
+}
+
+let comRunning = false;
+function maybeRunCOM(){
+  if(!G.isHost || comRunning) return;
+  if(G.roomStatus !== 'playing') return;
+  if(!isCOM(G.cur)) return;
+  if(G.passed[G.cur] || (G.remain[G.cur]||[]).length===0) return; //validCheckが自動パスするのを待つ
+
+  comRunning = true;
+  setTimeout(()=>{
+    comRunning = false;
+    //最新の状態でもう一度確認（他の操作で状況が変わっている可能性があるため）
+    if(!isCOM(G.cur) || G.roomStatus!=='playing') return;
+    const move = findAnyValidMove(G.cur);
+    if(!move) return; //置ける手がなければ validCheck 側の自動パスに任せる
+
+    const pcs = getPlaced(move.r, move.c, move.id, move.rot);
+    pcs.forEach(([rr,cc])=>G.board[rr][cc]=G.cur);
+    G.first[G.cur]=false;
+    const idx=G.remain[G.cur].indexOf(move.id);
+    if(idx!==-1) G.remain[G.cur].splice(idx,1);
+    G.lastPiece[G.cur]=move.id;
+    nextTurn();
+  }, 900);
 }
 
 
@@ -505,4 +598,5 @@ function showResult(){
   }
   const order=Object.keys(sc).map(Number).sort((a,b)=>sc[b]-sc[a]);
   alert('ゲーム終了!\n\n'+order.map((p,i)=>`${i+1}位: ${NAMES[p]} (${sc[p]}ポイント)`).join('\n'));
+  location.reload(); //ロビー画面に戻る
 }
