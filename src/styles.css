@@ -12,7 +12,68 @@ body {
    flex-direction: column;
    align-items: center;
    justify-content: center;
+   transform: scale(1);
+   transform-origin: top center;
+   transition: transform 0.15s;
 }
+
+/* ===== ロビー画面 ===== */
+#lobby {
+   max-width: 480px;
+   margin: 40px auto;
+   text-align: center;
+}
+#lobby h1 { font-size: 28px; margin-bottom: 24px; }
+.join-row { display: flex; gap: 8px; justify-content: center; margin: 16px 0; }
+.join-row input {
+   font-family: monospace;
+   font-size: 18px;
+   padding: 8px;
+   width: 160px;
+   text-transform: uppercase;
+   letter-spacing: 2px;
+}
+.game-button-wide {
+   cursor: pointer;
+   background-color: #f5f5f5;
+   border: 2px solid #000000;
+   border-radius: 6px;
+   padding: 10px 20px;
+   font-size: 16px;
+   margin: 6px 0;
+}
+#lobbyMsg { color: #d32f2f; font-size: 14px; }
+.hint { color: #777; font-size: 13px; }
+#seatList { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.seat-btn {
+   cursor: pointer;
+   border: 3px solid #ccc;
+   border-radius: 6px;
+   padding: 12px;
+   background: #ffffff;
+   font-size: 15px;
+}
+.seat-btn.mine { background: #fffbe6; font-weight: bold; }
+.seat-btn:disabled { cursor: not-allowed; opacity: 0.7; }
+
+/* ===== 拡大縮小 ===== */
+.zoom-area {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   font-size: 14px;
+   margin-bottom: 8px;
+}
+.zoom-button {
+   cursor: pointer;
+   width: 32px; height: 32px;
+   border-radius: 50%;
+   border: 1px solid #000;
+   background: #f5f5f5;
+   font-size: 18px;
+}
+#boardWrap { overflow: auto; max-width: 100%; }
+.myseat { font-size: 18px; margin-left: 8px; }
 
 .turn-area {
    font-size: 40px;

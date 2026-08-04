@@ -2,27 +2,63 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Blokus Base</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blokus Online</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<div class="game-area">
+<!-- ===== ロビー画面（部屋の作成・参加・席選び） ===== -->
+<div id="lobby">
+  <h1>Blokus オンライン対戦</h1>
+
+  <div id="lobby-entry">
+    <button class="game-button-wide" onclick="createRoom()">部屋を作る</button>
+    <div class="join-row">
+      <input id="roomCodeInput" placeholder="部屋コード（5文字）" maxlength="5">
+      <button class="game-button-wide" onclick="joinRoomFromInput()">参加する</button>
+    </div>
+    <p id="lobbyMsg"></p>
+  </div>
+
+  <div id="lobby-room" style="display:none;">
+    <p>部屋コード: <b id="roomCodeDisplay"></b></p>
+    <p class="hint">このコードを友達に伝えてください</p>
+    <div id="seatList"></div>
+    <button id="startBtn" class="game-button-wide" onclick="startGame()" style="display:none;">ゲーム開始</button>
+    <p class="hint">最低1人が参加していれば開始できます。空席のプレイヤーは自動でパス扱いになります。</p>
+  </div>
+</div>
+
+<!-- ===== ゲーム画面 ===== -->
+<div class="game-area" id="gameArea" style="display:none;">
     <div class="turn-area">
         <b id="tlabel">赤プレイヤー</b>のターン
+        <span id="myseatLabel" class="myseat"></span>
 
         <button class="game-button" onclick="doRotate()">回転(R)</button>
         <button class="game-button" onclick="doFlip()">反転(F)</button>
-        <!-- <button class="game-button" onclick="doPass()">パス</button> -->
     </div>
 
+    <div class="zoom-area">
+      <button class="zoom-button" onclick="setZoom(zoom-0.1)">－</button>
+      <span id="zoomLabel">100%</span>
+      <button class="zoom-button" onclick="setZoom(zoom+0.1)">＋</button>
+    </div>
 
-    <table id="board"></table>
+    <div id="boardWrap">
+      <table id="board"></table>
+    </div>
 
     <div id="pieces"></div>
 </div>
-    <div id="debug">操作ログ</div>
 
+<div id="debug">操作ログ</div>
+
+<!-- Firebase（オンライン対戦用） -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
 
 <script src="index.js"></script>
 </body>
