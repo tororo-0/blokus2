@@ -189,6 +189,35 @@ function startGame(){
 }
 
 /* =========================================================
+   招待メッセージのクリップボードコピー機能
+   ========================================================= */
+
+function copyInviteMessage() {
+  const code = G.roomId;
+  if (!code) return;
+
+  // 現在のページURLを取得（クエリパラメータなどを除いたベースURL）
+  const url = window.location.href.split('?')[0];
+
+  // 送信用メッセージの組み立て
+  const text = `Blokus対戦しませんか？\n部屋コード：${code}\n${url}`;
+
+  // クリップボードにコピー
+  navigator.clipboard.writeText(text).then(() => {
+    const msgEl = document.getElementById('copyMsg');
+    msgEl.textContent = 'コピーしました！';
+    
+    // 2秒後に「コピーしました！」を消す
+    setTimeout(() => {
+      msgEl.textContent = '';
+    }, 2000);
+  }).catch(err => {
+    alert('コピーに失敗しました。手動で部屋コードを共有してください。');
+    console.error('Copy failed: ', err);
+  });
+}
+
+/* =========================================================
    ゲーム状態のオンライン同期 (Firebase変換補正付き)
    ========================================================= */
 
@@ -253,6 +282,7 @@ function endGame(){
     db.ref('rooms/'+G.roomId+'/status').set('finished');
   }
 }
+
 
 /* =========================================================
    拡大・縮小
@@ -667,3 +697,4 @@ function showResult(){
   alert(msg);
   location.reload();
 }
+

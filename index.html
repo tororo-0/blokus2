@@ -23,11 +23,16 @@
   </div>
 
   <div id="lobby-room" style="display:none;">
-    <p>部屋コード: <b id="roomCodeDisplay"></b></p>
-    <p class="hint">このコードを友達に伝えてください</p>
+    <h3>部屋コード: <span id="roomCodeDisplay"></span></h3>
+    
+    <!-- ★追加：招待コードコピーボタン -->
+    <button id="copyInviteBtn" onclick="copyInviteMessage()" style="padding: 8px 16px; margin-bottom: 12px; cursor: pointer;">
+      📋 招待メッセージをコピー
+    </button>
+    <span id="copyMsg" style="color: green; margin-left: 8px;"></span>
+
     <div id="seatList"></div>
-    <button id="startBtn" class="game-button-wide" onclick="startGame()" style="display:none;">ゲーム開始</button>
-    <p class="hint">最低1人が参加していれば開始できます。空席のプレイヤーは自動でパス扱いになります（ホストは「CPUにする」で自動着手させることもできます）。</p>
+    <button id="startBtn" onclick="startGame()" style="display:none;">ゲーム開始</button>
   </div>
 </div>
 
