@@ -553,23 +553,36 @@ function nextTurn(){
 }
 
 /* =========================================================
-   CPU（COM）の自動着手
+   CPU（COM）の自動着手（大きいピース優先）
    ========================================================= */
 
 function findAnyValidMove(p){
-  for(const id of G.remain[p]){
+  // 残っているピースを「ブロック数が多い順（降降順）」にソートする
+  // ブロック数が同じなら、元のIDが大きいものを優先
+  const sortedRemain = [...G.remain[p]].sort((a, b) => {
+    const sizeA = PDEFS[a].length;
+    const sizeB = PDEFS[b].length;
+    if (sizeB !== sizeA) {
+      return sizeB - sizeA; // マス数が多い順
+    }
+    return b - a; // マス数が同じならIDが大きい順（右側のピース優先）
+  });
+
+  // ブロック数が大きいピースから順に置ける場所を探索
+  for(const id of sortedRemain){
     for(let rot=0; rot<4; rot++){
-      for(let r=0;r<SIZE;r++){
-        for(let c=0;c<SIZE;c++){
-          const pcs = getPlaced(r,c,id,rot);
-          if(pcs.some(([pr,pc])=>pr<0||pr>=SIZE||pc<0||pc>=SIZE)) continue;
-          if(isValid(p,pcs)) return {id,rot,r,c};
+      for(let r=0; r<SIZE; r++){
+        for(let c=0; c<SIZE; c++){
+          const pcs = getPlaced(r, c, id, rot);
+          if(pcs.some(([pr,pc]) => pr<0 || pr>=SIZE || pc<0 || pc>=SIZE)) continue;
+          if(isValid(p, pcs)) return {id, rot, r, c};
         }
       }
     }
   }
   return null;
 }
+
 
 let comRunning = false;
 function maybeRunCOM(){
@@ -595,29 +608,62 @@ function maybeRunCOM(){
   }, 900);
 }
 
+
+/* =========================================================
+   結果表示（順位順にすっきり表示）
+   ========================================================= */
+
 function showResult(){
-  const sc={};
-  for(let p=1;p<=4;p++){
+  const sc = {}; // 最終スコア（置いたマス数）
+  const placedCount = {}; // 置いたピースの個数
+
+  for(let p = 1; p <= 4; p++){
+    // 参加していないプレイヤーはスキップ
     if(!G.active[p]) continue;
 
-    let remainCells=0;
-    let score=0;
+    // 残っているマスの合計数を計算
+    let remainCells = 0;
     for(const id of G.remain[p]){
       remainCells += PDEFS[id].length;
     }
 
-    score -= remainCells;
+    // 置けたマスの合計数（全89マス - 残ったマス）
+    let score = 89 - remainCells;
 
+    // 全ピース置き切りボーナス（15点）
     if(G.remain[p].length === 0){
       score += 15;
+      // 上がりピースが1目盛り（ID:0）なら+5点
       if(G.lastPiece[p] === 0){
         score += 5;
       }
     }
 
-    sc[p]=score;
+    sc[p] = score;
+    placedCount[p] = 21 - G.remain[p].length; // 置けたピースの個数
   }
-  const order=Object.keys(sc).map(Number).sort((a,b)=>sc[b]-sc[a]);
-  alert('ゲーム終了!\n\n'+order.map((p,i)=>`${i+1}位: ${NAMES[p]} (${sc[p]}ポイント)`).join('\n'));
+
+  // スコアが高い順（降順）にソートしてプレイヤー配列を作成
+  const rankOrder = Object.keys(sc).map(Number).sort((a, b) => sc[b] - sc[a]);
+  const winner = rankOrder[0]; // 1位
+
+  // 結果メッセージの作成
+  let msg = `🎉 【勝者：${NAMES[winner]}！】 🎉\n\n`;
+  msg += `🏆 最終順位 🏆\n`;
+  msg += `------------------------------\n`;
+
+  // 1位から順番に表示を組み立て
+  rankOrder.forEach((p, idx) => {
+    const rank = idx + 1;
+    const badge = (rank === 1) ? '🥇 ' : (rank === 2) ? '🥈 ' : (rank === 3) ? '🥉 ' : '  ';
+    
+    msg += `${badge}第${rank}位：${NAMES[p]}\n`;
+    msg += `  得点：${sc[p]} pt (${placedCount[p]}個配置)\n`;
+    if(idx < rankOrder.length - 1) {
+      msg += `------------------------------\n`;
+    }
+  });
+
+  alert(msg);
   location.reload();
 }
