@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Blokus Online</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <!-- スマホでの拡大縮小崩れを防ぐため viewport 設定を調整 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Blokus Online</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -36,6 +37,8 @@
         <b id="tlabel">赤プレイヤー</b>のターン
         <span id="myseatLabel" class="myseat"></span>
 
+        <!-- ★ 「確定」ボタンを追加 ★ -->
+        <button id="confirmBtn" class="game-button confirm-button" onclick="doConfirm()" style="display:none;">確定</button>
         <button class="game-button" onclick="doRotate()">回転(R)</button>
         <button class="game-button" onclick="doFlip()">反転(F)</button>
         <button class="game-button end-button" onclick="endGame()">終了</button>

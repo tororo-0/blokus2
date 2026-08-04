@@ -2,7 +2,7 @@
 //COLORS→ピースの色
 //NAMES→プレイヤーごとの名前
 //CORNERS→角の座標 盤面の大きさに合わせて調整する
-//PDEFS→ピースデータ　片方向五個以上を想定していないので要注意
+//PDEFS→ピースデータ 片方向五個以上を想定していないので要注意
 //ピースデータの番号は０から始まるので注意
 const SIZE    = 20;
 const COLORS  = ['','#e63946','#2196f3','#4caf50','#ff9800'];
@@ -32,8 +32,6 @@ const PDEFS   = [
   [[0,3],[1,3],[1,2],[1,1],[1,0]],
 ];
 
-
-
 //ゲーム状態（プレイヤーのターンや残りピース、パス状況など）
 //active: そのプレイヤーの席に誰かが座っているか（オンライン対戦用）
 //mySeat/roomId/isHost: この端末（このブラウザ）に関する情報。Firebaseには送らないローカル専用の値
@@ -46,6 +44,7 @@ const G = {
   cur: 1, selId: null, rot: 0, hoverR: -1, hoverC: -1, flip:false,
   lastPiece: {1:null, 2:null, 3:null, 4:null},
   roomId: null, mySeat: null, isHost: false,
+  pendingMove: null // 仮置き（確定待ち）データ: { r, c, id, rot, flip, pcs }
 };
 
 let zoom = 0.6; //デフォルトの表示倍率
@@ -213,6 +212,9 @@ function subscribeGameState(){
     G.active    = s.active;
     G.cur       = s.cur;
     G.lastPiece = s.lastPiece;
+    
+    // 他人のターンまたは状態更新時は仮置きと選択状態をリセット
+    G.pendingMove = null;
     G.selId=null; G.rot=0; G.flip=false; G.hoverR=-1; G.hoverC=-1;
 
     const seatEl = document.getElementById('myseatLabel');
@@ -258,13 +260,13 @@ document.addEventListener('keydown', e=>{
 
 
 /* =========================================================
-   ここから下はもとのゲームロジック（一部、オンライン対応の変更あり）
+   ゲームロジック
    ========================================================= */
 
 //ピース変換
 function getShape(id, r){
   let cs = PDEFS[id].map(c=>[...c]);
-   if(G.flip){
+  if(G.flip){
     cs = cs.map(([r,c]) => [r,-c]);
     const mc =Math.min(...cs.map(([,c])=>c));
     cs = cs.map(([r,c])=>[r,c-mc]);
@@ -307,7 +309,6 @@ function isValid(p, cells){
 
 
 //テーブルを最初に一度だけ生成
-//render()ではDOMを壊さず、classとstyleだけ変える）
 const cells2d = []; // cells2d[r][c] = td要素
 
 (function buildBoard(){
@@ -318,39 +319,27 @@ const cells2d = []; // cells2d[r][c] = td要素
     for(let c=0;c<SIZE;c++){
       const td = document.createElement('td');
 
-      // クリック
+      // クリック（仮置き状態にする）
       td.addEventListener('click', ()=>{
         if(G.mySeat===null || G.cur!==G.mySeat){
           dbg('あなたのターンではありません');
           return;
         }
-        dbg('クリック td('+r+','+c+') selId='+G.selId);
         if(G.selId===null){ dbg('ピース未選択'); return; }
         const pcs = getPlaced(r,c,G.selId,G.rot);
         const ok  = isValid(G.cur, pcs);
-        dbg(
-          'クリック('+r+','+c+')\n'+
-          'id='+G.selId+' rot='+G.rot+'\n'+
-          'マス='+JSON.stringify(pcs)+'\n'+
-          'コーナー='+JSON.stringify(CORNERS[G.cur])+'\n'+
-          '初手='+G.first[G.cur]+'\n'+
-          'isValid='+ok
-        );
         if(!ok) return;
-        pcs.forEach(([r,c])=>G.board[r][c]=G.cur);
-        G.first[G.cur]=false;
-        const idx=G.remain[G.cur].indexOf(G.selId);
-        if(idx!==-1) G.remain[G.cur].splice(idx,1);
-        G.lastPiece[G.cur]=G.selId;
-        G.selId=null; G.rot=0;
-        nextTurn();
+
+        // 即時確定せず仮置き状態を保持
+        G.pendingMove = { r, c, id: G.selId, rot: G.rot, flip: G.flip, pcs };
+        render();
       });
 
-      //ホバー　仕様を理解していないのでこれ以上触らない
+      //ホバー
       td.addEventListener('mouseenter', ()=>{
         G.hoverR=r; G.hoverC=c;
         if (G.selId !== null) {
-            renderBoard();
+          renderBoard();
         }
       });
 
@@ -368,7 +357,28 @@ const cells2d = []; // cells2d[r][c] = td要素
 })();
 
 
-//ボードだけ再描画（DOMは壊さない）
+// 確定ボタンを押したときの処理
+function doConfirm(){
+  if(!G.pendingMove || G.cur !== G.mySeat) return;
+
+  const { id, pcs } = G.pendingMove;
+
+  // 盤面に確定反映
+  pcs.forEach(([r,c])=>G.board[r][c]=G.cur);
+  G.first[G.cur]=false;
+  
+  const idx=G.remain[G.cur].indexOf(id);
+  if(idx!==-1) G.remain[G.cur].splice(idx,1);
+
+  G.lastPiece[G.cur]=id;
+  G.pendingMove = null;
+  G.selId=null; G.rot=0; G.flip=false;
+
+  nextTurn();
+}
+
+
+//ボード再描画
 function renderBoard() {
   let pre=[], preOk=false;
   if(G.selId!==null && G.hoverR>=0){
@@ -376,6 +386,7 @@ function renderBoard() {
     preOk = isValid(G.cur, pre);
   }
   const preSet = new Set(pre.map(([r,c])=>r+','+c));
+  const pendingSet = new Set((G.pendingMove ? G.pendingMove.pcs : []).map(([r,c])=>r+','+c));
 
   for(let r=0;r<SIZE;r++){
     for(let c=0;c<SIZE;c++){
@@ -385,7 +396,11 @@ function renderBoard() {
       td.style.background='';
       td.style.opacity='';
 
-      if(preSet.has(key)){
+      if(pendingSet.has(key)){
+        // 仮置き中のマスの描画
+        td.style.background = COLORS[G.cur];
+        td.style.opacity = '0.6';
+      } else if(preSet.has(key)){
         if(preOk){ td.className='pre'; td.style.background=COLORS[G.cur]; }
         else      td.className='bad';
       } else if(G.board[r][c]>0){
@@ -393,27 +408,33 @@ function renderBoard() {
       } else {
         for(let p=1;p<=4;p++){
           if(G.first[p]&&G.active[p]&&CORNERS[p][0]===r&&CORNERS[p][1]===c) {
-            switch(p) {
-                case 1: td.className='corner1'; break;
-                case 2: td.className='corner2'; break;
-                case 3: td.className='corner3'; break;
-                case 4: td.className='corner4'; break;
-            }
-          };
+            td.className='corner'+p;
+          }
         }
       }
+    }
+  }
+
+  // 確定ボタンの表示/有効化の制御
+  const confirmBtn = document.getElementById('confirmBtn');
+  if(confirmBtn){
+    if(G.cur === G.mySeat){
+      confirmBtn.style.display = '';
+      confirmBtn.disabled = !G.pendingMove;
+    } else {
+      confirmBtn.style.display = 'none';
     }
   }
 }
 
 
-//ピース一覧を再描画（自分の手持ちピースを常に表示する。置けるのは自分の番の時だけ）
+//ピース一覧を再描画
 function renderPieces(){
   const lbl=document.getElementById('tlabel');
   lbl.textContent=NAMES[G.cur];
   lbl.style.color=COLORS[G.cur];
 
-  const seat = G.mySeat || G.cur; //観戦中(mySeatなし)の場合は手番のプレイヤーを表示
+  const seat = G.mySeat || G.cur;
   const pd=document.getElementById('pieces');
   pd.innerHTML='';
   for(const id of (G.remain[seat]||[])){
@@ -444,6 +465,7 @@ function renderPieces(){
         dbg('あなたのターンではありません');
         return;
       }
+      G.pendingMove = null; // ピースを選び直したら仮置きをリセット
       G.selId=id; G.rot=0;
       dbg('ピース選択: id='+id);
       renderPieces();
@@ -456,10 +478,17 @@ function renderPieces(){
 function render(){ renderBoard(); renderPieces(); }
 
 
-//回転（公式使用）
+//回転
 function doRotate(){
-  if(G.selId===null) return;
+  if(G.selId===null && !G.pendingMove) return;
   G.rot=(G.rot+1)%4;
+  if(G.pendingMove){
+    const pcs = getPlaced(G.pendingMove.r, G.pendingMove.c, G.pendingMove.id, G.rot);
+    if(isValid(G.cur, pcs)){
+      G.pendingMove.rot = G.rot;
+      G.pendingMove.pcs = pcs;
+    }
+  }
   renderBoard();
 }
 document.addEventListener('keydown',e=>{ if(e.key==='r'||e.key==='R') doRotate(); });
@@ -467,14 +496,21 @@ document.addEventListener('keydown',e=>{ if(e.key==='r'||e.key==='R') doRotate()
 
 //反転
 function doFlip(){
-  if(G.selId===null) return;
-  G.flip = !G.flip //trueとfalseの切り替え用
+  if(G.selId===null && !G.pendingMove) return;
+  G.flip = !G.flip;
+  if(G.pendingMove){
+    const pcs = getPlaced(G.pendingMove.r, G.pendingMove.c, G.pendingMove.id, G.rot);
+    if(isValid(G.cur, pcs)){
+      G.pendingMove.flip = G.flip;
+      G.pendingMove.pcs = pcs;
+    }
+  }
   renderBoard();
 }
 document.addEventListener('keydown',e=>{ if(e.key==='f'||e.key==='F') doFlip(); });
 
 
-//パス（置ける場所がない時の自動パス専用。空席のプレイヤーもここを通る）
+//パス
 function doPass(){
   G.passed[G.cur]=true;
   nextTurn();
@@ -506,7 +542,7 @@ function validCheck() {
   }
 }
 
-//ターン送り（active=trueの席だけを対象にする）
+//ターン送り
 function nextTurn(){
   const allDone=[1,2,3,4].every(p=>!G.active[p]||G.passed[p]||G.remain[p].length===0);
   if(allDone){
@@ -519,7 +555,7 @@ function nextTurn(){
     if(G.active[G.cur]&&!G.passed[G.cur]&&G.remain[G.cur].length>0) break;
   }
   G.hoverR=-1; G.hoverC=-1;
-  G.selId=null; G.rot=0; G.flip=false;
+  G.selId=null; G.rot=0; G.flip=false; G.pendingMove=null;
   syncState();
   render();
   validCheck();
@@ -528,8 +564,6 @@ function nextTurn(){
 
 /* =========================================================
    CPU（COM）の自動着手
-   置ける手の中から見つかった最初の手を置くだけの簡易ロジック。
-   ホストのブラウザだけが実行する（複数端末が同時に着手するのを防ぐため）。
    ========================================================= */
 
 function findAnyValidMove(p){
@@ -552,15 +586,14 @@ function maybeRunCOM(){
   if(!G.isHost || comRunning) return;
   if(G.roomStatus !== 'playing') return;
   if(!isCOM(G.cur)) return;
-  if(G.passed[G.cur] || (G.remain[G.cur]||[]).length===0) return; //validCheckが自動パスするのを待つ
+  if(G.passed[G.cur] || (G.remain[G.cur]||[]).length===0) return;
 
   comRunning = true;
   setTimeout(()=>{
     comRunning = false;
-    //最新の状態でもう一度確認（他の操作で状況が変わっている可能性があるため）
     if(!isCOM(G.cur) || G.roomStatus!=='playing') return;
     const move = findAnyValidMove(G.cur);
-    if(!move) return; //置ける手がなければ validCheck 側の自動パスに任せる
+    if(!move) return;
 
     const pcs = getPlaced(move.r, move.c, move.id, move.rot);
     pcs.forEach(([rr,cc])=>G.board[rr][cc]=G.cur);
@@ -573,11 +606,11 @@ function maybeRunCOM(){
 }
 
 
-///採点　一旦アラートで表示
+// 採点表示
 function showResult(){
   const sc={};
-  for(let p=1;p<=4;p++){//ピース数変更後は注意
-    if(!G.active[p]) continue; //空席は採点しない
+  for(let p=1;p<=4;p++){
+    if(!G.active[p]) continue;
 
     let remainCells=0;
     let score=0;
@@ -598,5 +631,5 @@ function showResult(){
   }
   const order=Object.keys(sc).map(Number).sort((a,b)=>sc[b]-sc[a]);
   alert('ゲーム終了!\n\n'+order.map((p,i)=>`${i+1}位: ${NAMES[p]} (${sc[p]}ポイント)`).join('\n'));
-  location.reload(); //ロビー画面に戻る
+  location.reload();
 }
