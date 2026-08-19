@@ -2,14 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <!-- スマホでの拡大縮小崩れを防ぐため viewport 設定を調整 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Blokus Online</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<!-- ===== ロビー画面（部屋の作成・参加・席選び） ===== -->
+<!-- ===== ロビー画面（部屋の作成・参加） ===== -->
 <div id="lobby">
   <h1>Blokus オンライン対戦</h1>
 
@@ -24,35 +23,39 @@
 
   <div id="lobby-room" style="display:none;">
     <h3>部屋コード: <span id="roomCodeDisplay"></span></h3>
-    
-    <!-- ★追加：招待コードコピーボタン -->
-    <button id="copyInviteBtn" onclick="copyInviteMessage()" style="padding: 8px 16px; margin-bottom: 12px; cursor: pointer;">
-      📋 招待メッセージをコピー
-    </button>
-    <span id="copyMsg" style="color: green; margin-left: 8px;"></span>
+
+    <button id="copyInviteBtn" onclick="copyInviteMessage()">📋 招待メッセージをコピー</button>
+    <span id="copyMsg"></span>
+
+    <div id="mySeatPanel">
+      <label>あなたの名前：</label>
+      <input id="myNameInput" maxlength="10">
+      <button onclick="saveMyName()">保存</button>
+      <button id="readyBtn" onclick="toggleReady()">準備OK</button>
+    </div>
 
     <div id="seatList"></div>
     <button id="startBtn" onclick="startGame()" style="display:none;">ゲーム開始</button>
+    <p class="hint">ホストが「ゲーム開始」を押すと、空席には自動でCPUが入り、プレイヤーの色（手番順）はランダムに決まります。</p>
   </div>
 </div>
 
 <!-- ===== ゲーム画面 ===== -->
 <div class="game-area" id="gameArea" style="display:none;">
+
+    <div id="timerLabel" class="timer-label">60秒</div>
+    <div id="turnAnnounce" class="turn-announce"></div>
+
     <div class="turn-area">
         <b id="tlabel">赤プレイヤー</b>のターン
         <span id="myseatLabel" class="myseat"></span>
+    </div>
 
-        <!-- ★ 「確定」ボタンを追加 ★ -->
+    <div class="control-row">
         <button id="confirmBtn" class="game-button confirm-button" onclick="doConfirm()" style="display:none;">確定</button>
         <button class="game-button" onclick="doRotate()">回転(R)</button>
         <button class="game-button" onclick="doFlip()">反転(F)</button>
         <button class="game-button end-button" onclick="endGame()">終了</button>
-    </div>
-
-    <div class="zoom-area">
-      <button class="zoom-button" onclick="setZoom(zoom-0.1)">－</button>
-      <span id="zoomLabel">60%</span>
-      <button class="zoom-button" onclick="setZoom(zoom+0.1)">＋</button>
     </div>
 
     <div id="boardWrap">
@@ -60,6 +63,9 @@
     </div>
 
     <div id="pieces"></div>
+
+    <div id="opponentBar"></div>
+    <div id="opponentPieces" style="display:none;"></div>
 </div>
 
 <!-- Firebase（オンライン対戦用） -->
