@@ -12,3 +12,9 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
+// 匿名で自動サインイン（画面や操作感には影響しません）
+firebase.auth().signInAnonymously().catch(e=>{
+  console.error('匿名サインインに失敗しました', e);
+  alert('接続に失敗しました。時間をおいて再度お試しください。');
+});
