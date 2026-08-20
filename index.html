@@ -60,12 +60,26 @@
 
     <div id="boardWrap">
       <table id="board"></table>
+      <div id="floatingControls" class="floating-controls" style="display:none;">
+        <button onclick="doRotate()" title="回転">🔄️</button>
+        <button onclick="doFlip()" title="反転">↩️</button>
+        <button onclick="doConfirm()" title="確定">✅</button>
+      </div>
     </div>
 
     <div id="pieces"></div>
 
     <div id="opponentBar"></div>
     <div id="opponentPieces" style="display:none;"></div>
+</div>
+
+<!-- ===== 結果画面 ===== -->
+<div id="resultScreen" style="display:none;">
+  <h1>ゲーム終了</h1>
+  <div id="resultRanking"></div>
+  <h3>最終盤面</h3>
+  <div id="resultBoardWrap"></div>
+  <button class="game-button-wide" onclick="location.reload()">ロビーに戻る</button>
 </div>
 
 <!-- Firebase（オンライン対戦用） -->

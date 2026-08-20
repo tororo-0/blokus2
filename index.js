@@ -48,6 +48,7 @@ const G = {
   names: {}, isCOMMap: {}, seatMap: {},
   roomStatus: null, turnDeadline: null, timeoutTriggered: false,
   openedOpponent: null,
+  dragging: false, rotateStartAngle: null,
 };
 
 let zoom = 1;
@@ -455,6 +456,8 @@ const cells2d = [];
     const tr = document.createElement('tr');
     for(let c=0;c<SIZE;c++){
       const td = document.createElement('td');
+      td.dataset.r = r;
+      td.dataset.c = c;
 
       td.addEventListener('click', ()=>{
         if(G.myColor===null || G.cur!==G.myColor){ return; }
@@ -483,6 +486,161 @@ const cells2d = [];
     tbl.appendChild(tr);
   }
 })();
+
+/* =========================================================
+   指でのドラッグ＆ドロップ（スマホ向け）
+   ピース一覧のボタンを長押し・ドラッグして盤面上にドロップすると
+   タップ選択と同じ「仮置き（pendingMove）」状態になる。
+   ========================================================= */
+
+function startPieceDrag(id, touch){
+  G.pendingMove = null;
+  G.selId = id; G.rot = 0; G.flip = false;
+  G.dragging = true;
+  G.rotateStartAngle = null;
+  renderPieces();
+  renderBoard();
+  createDragGhost();
+  moveDragGhost(touch.clientX, touch.clientY);
+}
+
+//ghost（ドラッグ中の指の下に表示するピース）の見た目を、器だけ作る
+function createDragGhost(){
+  removeDragGhost();
+  const ghost = document.createElement('div');
+  ghost.id = 'dragGhost';
+  ghost.className = 'drag-ghost';
+  document.body.appendChild(ghost);
+  refreshGhostShape();
+}
+
+//現在のG.rot/G.flipに合わせてghostの中身を作り直す（回転させた見た目を反映するため）
+function refreshGhostShape(){
+  const ghost = document.getElementById('dragGhost');
+  if(!ghost || G.selId===null) return;
+
+  const sh = getShape(G.selId, G.rot);
+  const mr = Math.max(...sh.map(([r])=>r));
+  const mc = Math.max(...sh.map(([,c])=>c));
+  const t = document.createElement('table');
+  for(let r=0;r<=mr;r++){
+    const row = document.createElement('tr');
+    for(let c=0;c<=mc;c++){
+      const cell = document.createElement('td');
+      if(sh.some(([sr,sc])=>sr===r&&sc===c)) cell.style.background = COLORS[G.cur];
+      row.appendChild(cell);
+    }
+    t.appendChild(row);
+  }
+  ghost.innerHTML = '';
+  ghost.appendChild(t);
+}
+
+function moveDragGhost(x, y){
+  const ghost = document.getElementById('dragGhost');
+  if(!ghost) return;
+  ghost.style.left = x + 'px';
+  ghost.style.top = y + 'px';
+}
+
+function removeDragGhost(){
+  const ghost = document.getElementById('dragGhost');
+  if(ghost) ghost.remove();
+}
+
+//ドラッグ中にピースを90度回転させる（dir: 1=時計回り, -1=反時計回り）
+function rotateDraggingPiece(dir){
+  G.rot = ((G.rot + dir) % 4 + 4) % 4;
+  refreshGhostShape();
+  renderBoard(); //hoverプレビューにも回転後の形を反映
+}
+
+function angleBetweenTouches(t1, t2){
+  return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
+}
+
+function angleDiff(a, b){
+  let d = a - b;
+  while(d > 180) d -= 360;
+  while(d < -180) d += 360;
+  return d;
+}
+
+//2本目の指が触れた瞬間、回転ジェスチャーの基準角度を記録する
+document.addEventListener('touchstart', (e)=>{
+  if(!G.dragging) return;
+  if(e.touches.length >= 2){
+    e.preventDefault();
+    G.rotateStartAngle = angleBetweenTouches(e.touches[0], e.touches[1]);
+  }
+}, { passive:false });
+
+document.addEventListener('touchmove', (e)=>{
+  if(!G.dragging) return;
+  e.preventDefault();
+
+  //2本指：指を捻った角度が45度を超えるたびに90度回転させる
+  if(e.touches.length >= 2){
+    const angle = angleBetweenTouches(e.touches[0], e.touches[1]);
+    if(G.rotateStartAngle === null){
+      G.rotateStartAngle = angle;
+    } else {
+      const diff = angleDiff(angle, G.rotateStartAngle);
+      if(diff >= 45){
+        rotateDraggingPiece(1);
+        G.rotateStartAngle = angle;
+      } else if(diff <= -45){
+        rotateDraggingPiece(-1);
+        G.rotateStartAngle = angle;
+      }
+    }
+  }
+
+  //盤面上の位置は常に1本目の指（親指/人差し指）の位置で追従させる
+  const primary = e.touches[0];
+  moveDragGhost(primary.clientX, primary.clientY);
+
+  const el = document.elementFromPoint(primary.clientX, primary.clientY);
+  if(el && el.dataset && el.dataset.r !== undefined){
+    G.hoverR = parseInt(el.dataset.r, 10);
+    G.hoverC = parseInt(el.dataset.c, 10);
+  } else {
+    G.hoverR = -1; G.hoverC = -1;
+  }
+  renderBoard();
+}, { passive:false });
+
+function finishDrag(){
+  G.dragging = false;
+  G.rotateStartAngle = null;
+  removeDragGhost();
+
+  if(G.hoverR>=0 && G.selId!==null){
+    const pcs = getPlaced(G.hoverR, G.hoverC, G.selId, G.rot);
+    if(isValid(G.cur, pcs)){
+      G.pendingMove = { r:G.hoverR, c:G.hoverC, id:G.selId, rot:G.rot, flip:G.flip, pcs };
+    }
+  }
+  G.hoverR=-1; G.hoverC=-1;
+  render();
+}
+
+document.addEventListener('touchend', (e)=>{
+  if(!G.dragging) return;
+  if(e.touches.length > 0){
+    //まだ指が残っている（回転ジェスチャー用の指を離しただけ）→ドラッグを継続
+    G.rotateStartAngle = null;
+    return;
+  }
+  finishDrag();
+});
+
+document.addEventListener('touchcancel', (e)=>{
+  if(!G.dragging) return;
+  if(e.touches.length > 0) return;
+  finishDrag();
+});
+
 
 function doConfirm(){
   if(!G.pendingMove || G.cur !== G.myColor) return;
@@ -546,6 +704,36 @@ function renderBoard() {
       confirmBtn.style.display = 'none';
     }
   }
+
+  positionFloatingControls();
+}
+
+//盤面に仮置きしたピースのそばに、回転・反転・確定ボタンを表示する
+function positionFloatingControls(){
+  const fc = document.getElementById('floatingControls');
+  if(!fc) return;
+  if(!G.pendingMove || G.cur !== G.myColor){
+    fc.style.display = 'none';
+    return;
+  }
+  const pcs = G.pendingMove.pcs;
+  const cell = 28;
+  const controlsWidth = 110;
+  const boardPx = SIZE * cell;
+
+  const minR = Math.min(...pcs.map(p=>p[0]));
+  const minC = Math.min(...pcs.map(p=>p[1]));
+  const maxC = Math.max(...pcs.map(p=>p[1]));
+
+  let left = (maxC + 1) * cell + 4;
+  if(left + controlsWidth > boardPx){
+    left = Math.max(0, minC * cell - controlsWidth - 4);
+  }
+  const top = Math.max(0, minR * cell);
+
+  fc.style.left = left + 'px';
+  fc.style.top = top + 'px';
+  fc.style.display = 'flex';
 }
 
 function renderPieces(){
@@ -584,6 +772,13 @@ function renderPieces(){
       renderPieces();
       renderBoard();
     });
+
+    btn.addEventListener('touchstart', (e)=>{
+      if(G.myColor===null || G.cur!==G.myColor) return;
+      e.preventDefault();
+      startPieceDrag(id, e.touches[0]);
+    }, { passive:false });
+
     pd.appendChild(btn);
   }
 }
@@ -807,21 +1002,49 @@ function showResult(){
   }
 
   const rankOrder = Object.keys(sc).map(Number).sort((a, b) => sc[b] - sc[a]);
-  const winner = rankOrder[0];
 
-  let msg = `🎉 【勝者：${G.names[winner] || NAMES[winner]}！】 🎉\n\n`;
-  msg += `🏆 最終順位 🏆\n`;
-  msg += `------------------------------\n`;
-
+  const listEl = document.getElementById('resultRanking');
+  listEl.innerHTML = '';
   rankOrder.forEach((p, idx) => {
     const rank = idx + 1;
-    const badge = (rank === 1) ? '🥇 ' : (rank === 2) ? '🥈 ' : (rank === 3) ? '🥉 ' : '  ';
+    const badge = (rank === 1) ? '🥇' : (rank === 2) ? '🥈' : (rank === 3) ? '🥉' : (rank + '位');
     const nm = G.names[p] || NAMES[p];
-    msg += `${badge}第${rank}位：${nm}\n`;
-    msg += `  得点：${sc[p]} pt (${placedCount[p]}個配置)\n`;
-    if(idx < rankOrder.length - 1) msg += `------------------------------\n`;
+
+    const row = document.createElement('div');
+    row.className = 'result-row' + (rank === 1 ? ' winner' : '');
+
+    const line1 = document.createElement('div');
+    line1.textContent = `${badge} 第${rank}位：${nm}`;
+    const line2 = document.createElement('div');
+    line2.textContent = `得点：${sc[p]} pt（${placedCount[p]}個配置）`;
+
+    row.appendChild(line1);
+    row.appendChild(line2);
+    listEl.appendChild(row);
   });
 
-  alert(msg);
-  location.reload();
+  const boardWrap = document.getElementById('resultBoardWrap');
+  boardWrap.innerHTML = '';
+  boardWrap.appendChild(buildResultBoardTable(G.board));
+
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('gameArea').style.display = 'none';
+  document.getElementById('resultScreen').style.display = '';
+}
+
+//最終盤面を、操作できない静止画として表示する
+function buildResultBoardTable(board){
+  const t = document.createElement('table');
+  t.id = 'resultBoardTable';
+  for(let r=0;r<SIZE;r++){
+    const tr = document.createElement('tr');
+    for(let c=0;c<SIZE;c++){
+      const td = document.createElement('td');
+      const v = board[r][c];
+      if(v>0) td.style.background = COLORS[v];
+      tr.appendChild(td);
+    }
+    t.appendChild(tr);
+  }
+  return t;
 }

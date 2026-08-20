@@ -154,7 +154,78 @@ body {
    justify-content: center;
 }
 
-#boardWrap { overflow: visible; max-width: 100%; }
+#boardWrap { position: relative; overflow: visible; max-width: 100%; }
+
+/* ===== 盤面上に出るフローティング操作ボタン ===== */
+.floating-controls {
+   position: absolute;
+   display: flex;
+   gap: 4px;
+   background: rgba(255,255,255,0.95);
+   border: 1px solid #999;
+   border-radius: 8px;
+   padding: 3px;
+   z-index: 80;
+   box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+.floating-controls button {
+   width: 32px;
+   height: 32px;
+   font-size: 16px;
+   border: none;
+   background: transparent;
+   cursor: pointer;
+   border-radius: 6px;
+}
+.floating-controls button:active { background: #eee; }
+
+/* ===== ドラッグ中のピース（指の下に追従） ===== */
+.drag-ghost {
+   position: fixed;
+   left: 0; top: 0;
+   transform: translate(-50%, -50%);
+   pointer-events: none;
+   z-index: 300;
+   background: rgba(255,255,255,0.9);
+   border: 2px solid #333;
+   border-radius: 6px;
+   padding: 4px;
+   opacity: 0.85;
+}
+.drag-ghost table { border-collapse: collapse; }
+.drag-ghost td { width: 20px; height: 20px; border: 1px solid #ddd; }
+
+/* ===== 結果画面 ===== */
+#resultScreen {
+   max-width: 480px;
+   margin: 30px auto;
+   text-align: center;
+   padding: 0 10px;
+}
+#resultScreen h1 { font-size: 26px; margin-bottom: 8px; }
+#resultScreen h3 { font-size: 16px; margin: 16px 0 8px; }
+.result-row {
+   border: 2px solid #ddd;
+   border-radius: 6px;
+   padding: 8px 12px;
+   margin: 6px 0;
+   text-align: left;
+   font-size: 14px;
+   background: #fff;
+}
+.result-row.winner { border-color: #ffb300; background: #fff8e1; font-weight: bold; }
+#resultBoardWrap {
+   display: flex;
+   justify-content: center;
+   margin: 12px 0;
+   overflow: auto;
+}
+#resultBoardTable { border-collapse: collapse; }
+#resultBoardTable td {
+   width: 12px; height: 12px;
+   border: 1px solid #eee;
+   box-sizing: border-box;
+}
 
 #board {
    border-collapse: collapse;
