@@ -829,6 +829,29 @@ function render(){
   renderOpponentPieces();
 }
 
+//盤面・ピース一覧・操作ボタン以外の場所をタップしたら、選択中/仮置き中のピースを解除する
+document.addEventListener('click', (e)=>{
+  if(G.selId===null && !G.pendingMove) return;
+  if(G.dragging) return; //ドラッグ操作中に発火した合成clickは無視
+
+  const target = e.target;
+  const insideBoard       = target.closest('#board');
+  const insideFloating    = target.closest('#floatingControls');
+  const insidePieces      = target.closest('#pieces');
+  const insideControlRow  = target.closest('.control-row');
+  const insideOpponentBar = target.closest('#opponentBar');
+  const insideOpponentPcs = target.closest('#opponentPieces');
+
+  if(insideBoard || insideFloating || insidePieces || insideControlRow || insideOpponentBar || insideOpponentPcs){
+    return;
+  }
+
+  G.selId = null;
+  G.pendingMove = null;
+  G.rot = 0; G.flip = false;
+  render();
+});
+
 function doRotate(){
   if(G.selId===null && !G.pendingMove) return;
   G.rot=(G.rot+1)%4;
