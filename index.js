@@ -48,7 +48,7 @@ const G = {
   names: {}, isCOMMap: {}, seatMap: {},
   roomStatus: null, turnDeadline: null, timeoutTriggered: false,
   openedOpponent: null,
-  dragging: false, rotateStartAngle: null,
+  dragging: false, dragOffsetR: 0, dragOffsetC: 0,
 };
 
 let zoom = 1;
@@ -464,9 +464,8 @@ const cells2d = [];
         if(G.selId===null) return;
 
         const pcs = getPlaced(r,c,G.selId,G.rot);
-        if(!isValid(G.cur, pcs)) return;
-
-        G.pendingMove = { r, c, id: G.selId, rot: G.rot, flip: G.flip, pcs };
+        const valid = isValid(G.cur, pcs);
+        G.pendingMove = { r, c, id: G.selId, rot: G.rot, flip: G.flip, pcs, valid };
         renderBoard();
       });
 
@@ -480,6 +479,15 @@ const cells2d = [];
         doRotate();
       });
 
+      //仮置き中のピースの上を長押しすると、そのままつかんで動かせる
+      td.addEventListener('touchstart', (e)=>{
+        if(!G.pendingMove || G.cur !== G.myColor) return;
+        const grabbed = G.pendingMove.pcs.some(([pr,pc])=>pr===r&&pc===c);
+        if(!grabbed) return;
+        e.preventDefault();
+        startBoardDrag(r, c, e.touches[0]);
+      }, { passive:false });
+
       cells2d[r][c] = td;
       tr.appendChild(td);
     }
@@ -489,16 +497,34 @@ const cells2d = [];
 
 /* =========================================================
    指でのドラッグ＆ドロップ（スマホ向け）
-   ピース一覧のボタンを長押し・ドラッグして盤面上にドロップすると
-   タップ選択と同じ「仮置き（pendingMove）」状態になる。
+   ・ピース一覧のボタンを長押し→盤面にドロップ：新しく仮置きする
+   ・仮置き済みのピースを長押し→別の場所にドロップ：置き直す
+   置けない場所にドロップしても仮置き状態にはなり、フローティングの
+   回転・反転ボタンで向きを直してから、もう一度ドラッグして動かせる。
    ========================================================= */
 
 function startPieceDrag(id, touch){
   G.pendingMove = null;
   G.selId = id; G.rot = 0; G.flip = false;
+  G.dragOffsetR = 0; G.dragOffsetC = 0;
   G.dragging = true;
-  G.rotateStartAngle = null;
   renderPieces();
+  renderBoard();
+  createDragGhost();
+  moveDragGhost(touch.clientX, touch.clientY);
+}
+
+//盤面上に仮置き済みのピースをつかんで動かす
+function startBoardDrag(grabR, grabC, touch){
+  const pm = G.pendingMove;
+  G.selId = pm.id;
+  G.rot = pm.rot;
+  G.flip = pm.flip;
+  G.dragOffsetR = grabR - pm.r;
+  G.dragOffsetC = grabC - pm.c;
+  G.pendingMove = null;
+  G.dragging = true;
+  G.hoverR = grabR; G.hoverC = grabC;
   renderBoard();
   createDragGhost();
   moveDragGhost(touch.clientX, touch.clientY);
@@ -514,7 +540,7 @@ function createDragGhost(){
   refreshGhostShape();
 }
 
-//現在のG.rot/G.flipに合わせてghostの中身を作り直す（回転させた見た目を反映するため）
+//現在のG.rot/G.flipに合わせてghostの中身を作り直す
 function refreshGhostShape(){
   const ghost = document.getElementById('dragGhost');
   if(!ghost || G.selId===null) return;
@@ -548,59 +574,14 @@ function removeDragGhost(){
   if(ghost) ghost.remove();
 }
 
-//ドラッグ中にピースを90度回転させる（dir: 1=時計回り, -1=反時計回り）
-function rotateDraggingPiece(dir){
-  G.rot = ((G.rot + dir) % 4 + 4) % 4;
-  refreshGhostShape();
-  renderBoard(); //hoverプレビューにも回転後の形を反映
-}
-
-function angleBetweenTouches(t1, t2){
-  return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
-}
-
-function angleDiff(a, b){
-  let d = a - b;
-  while(d > 180) d -= 360;
-  while(d < -180) d += 360;
-  return d;
-}
-
-//2本目の指が触れた瞬間、回転ジェスチャーの基準角度を記録する
-document.addEventListener('touchstart', (e)=>{
-  if(!G.dragging) return;
-  if(e.touches.length >= 2){
-    e.preventDefault();
-    G.rotateStartAngle = angleBetweenTouches(e.touches[0], e.touches[1]);
-  }
-}, { passive:false });
-
 document.addEventListener('touchmove', (e)=>{
   if(!G.dragging) return;
   e.preventDefault();
 
-  //2本指：指を捻った角度が45度を超えるたびに90度回転させる
-  if(e.touches.length >= 2){
-    const angle = angleBetweenTouches(e.touches[0], e.touches[1]);
-    if(G.rotateStartAngle === null){
-      G.rotateStartAngle = angle;
-    } else {
-      const diff = angleDiff(angle, G.rotateStartAngle);
-      if(diff >= 45){
-        rotateDraggingPiece(1);
-        G.rotateStartAngle = angle;
-      } else if(diff <= -45){
-        rotateDraggingPiece(-1);
-        G.rotateStartAngle = angle;
-      }
-    }
-  }
+  const touch = e.touches[0];
+  moveDragGhost(touch.clientX, touch.clientY);
 
-  //盤面上の位置は常に1本目の指（親指/人差し指）の位置で追従させる
-  const primary = e.touches[0];
-  moveDragGhost(primary.clientX, primary.clientY);
-
-  const el = document.elementFromPoint(primary.clientX, primary.clientY);
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
   if(el && el.dataset && el.dataset.r !== undefined){
     G.hoverR = parseInt(el.dataset.r, 10);
     G.hoverC = parseInt(el.dataset.c, 10);
@@ -612,26 +593,23 @@ document.addEventListener('touchmove', (e)=>{
 
 function finishDrag(){
   G.dragging = false;
-  G.rotateStartAngle = null;
   removeDragGhost();
 
   if(G.hoverR>=0 && G.selId!==null){
-    const pcs = getPlaced(G.hoverR, G.hoverC, G.selId, G.rot);
-    if(isValid(G.cur, pcs)){
-      G.pendingMove = { r:G.hoverR, c:G.hoverC, id:G.selId, rot:G.rot, flip:G.flip, pcs };
-    }
+    const anchorR = G.hoverR - G.dragOffsetR;
+    const anchorC = G.hoverC - G.dragOffsetC;
+    const pcs = getPlaced(anchorR, anchorC, G.selId, G.rot);
+    const valid = isValid(G.cur, pcs);
+    G.pendingMove = { r:anchorR, c:anchorC, id:G.selId, rot:G.rot, flip:G.flip, pcs, valid };
   }
   G.hoverR=-1; G.hoverC=-1;
+  G.dragOffsetR = 0; G.dragOffsetC = 0;
   render();
 }
 
 document.addEventListener('touchend', (e)=>{
   if(!G.dragging) return;
-  if(e.touches.length > 0){
-    //まだ指が残っている（回転ジェスチャー用の指を離しただけ）→ドラッグを継続
-    G.rotateStartAngle = null;
-    return;
-  }
+  if(e.touches.length > 0) return; //まだ指が残っていれば継続
   finishDrag();
 });
 
@@ -643,7 +621,7 @@ document.addEventListener('touchcancel', (e)=>{
 
 
 function doConfirm(){
-  if(!G.pendingMove || G.cur !== G.myColor) return;
+  if(!G.pendingMove || !G.pendingMove.valid || G.cur !== G.myColor) return;
   const { id, pcs } = G.pendingMove;
   if(!isValid(G.cur, pcs)) return;
 
@@ -663,11 +641,14 @@ function doConfirm(){
 function renderBoard() {
   let pre=[], preOk=false;
   if(G.selId!==null && G.hoverR>=0){
-    pre   = getPlaced(G.hoverR,G.hoverC,G.selId,G.rot);
+    const anchorR = G.hoverR - (G.dragOffsetR||0);
+    const anchorC = G.hoverC - (G.dragOffsetC||0);
+    pre   = getPlaced(anchorR,anchorC,G.selId,G.rot);
     preOk = isValid(G.cur, pre);
   }
   const preSet = new Set(pre.map(([r,c])=>r+','+c));
   const pendingSet = new Set((G.pendingMove ? G.pendingMove.pcs : []).map(([r,c])=>r+','+c));
+  const pendingValid = G.pendingMove ? G.pendingMove.valid : false;
 
   for(let r=0;r<SIZE;r++){
     for(let c=0;c<SIZE;c++){
@@ -678,8 +659,12 @@ function renderBoard() {
       td.style.opacity='';
 
       if(pendingSet.has(key)){
-        td.style.background = COLORS[G.cur];
-        td.style.opacity = '0.6';
+        if(pendingValid){
+          td.style.background = COLORS[G.cur];
+          td.style.opacity = '0.6';
+        } else {
+          td.className = 'bad';
+        }
       } else if(preSet.has(key)){
         if(preOk){ td.className='pre'; td.style.background=COLORS[G.cur]; }
         else      td.className='bad';
@@ -699,7 +684,7 @@ function renderBoard() {
   if(confirmBtn){
     if(G.cur === G.myColor){
       confirmBtn.style.display = '';
-      confirmBtn.disabled = !G.pendingMove;
+      confirmBtn.disabled = !G.pendingMove || !G.pendingMove.valid;
     } else {
       confirmBtn.style.display = 'none';
     }
@@ -734,6 +719,9 @@ function positionFloatingControls(){
   fc.style.left = left + 'px';
   fc.style.top = top + 'px';
   fc.style.display = 'flex';
+
+  const floatingConfirm = document.getElementById('floatingConfirmBtn');
+  if(floatingConfirm) floatingConfirm.disabled = !G.pendingMove.valid;
 }
 
 function renderPieces(){
@@ -849,10 +837,9 @@ function doRotate(){
   G.rot=(G.rot+1)%4;
   if(G.pendingMove){
     const pcs = getPlaced(G.pendingMove.r, G.pendingMove.c, G.pendingMove.id, G.rot);
-    if(isValid(G.cur, pcs)){
-      G.pendingMove.rot = G.rot;
-      G.pendingMove.pcs = pcs;
-    }
+    G.pendingMove.rot = G.rot;
+    G.pendingMove.pcs = pcs;
+    G.pendingMove.valid = isValid(G.cur, pcs);
   }
   renderBoard();
 }
@@ -863,10 +850,9 @@ function doFlip(){
   G.flip = !G.flip;
   if(G.pendingMove){
     const pcs = getPlaced(G.pendingMove.r, G.pendingMove.c, G.pendingMove.id, G.rot);
-    if(isValid(G.cur, pcs)){
-      G.pendingMove.flip = G.flip;
-      G.pendingMove.pcs = pcs;
-    }
+    G.pendingMove.flip = G.flip;
+    G.pendingMove.pcs = pcs;
+    G.pendingMove.valid = isValid(G.cur, pcs);
   }
   renderBoard();
 }
