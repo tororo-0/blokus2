@@ -48,12 +48,13 @@ const G = {
   names: {}, isCOMMap: {}, seatMap: {},
   roomStatus: null, turnDeadline: null, timeoutTriggered: false,
   openedOpponent: null,
-  dragging: false, dragOffsetR: 0, dragOffsetC: 0,
+  dragging: false,
 };
 
 let zoom = 1;
 let seatsCache = {};
 let lastCur = null;
+let activeDragTouchId = null;
 
 function dbg(s){ console.log(s); }
 
@@ -480,12 +481,15 @@ const cells2d = [];
       });
 
       //仮置き中のピースの上を長押しすると、そのままつかんで動かせる
+      //（一旦、仮置きを解除してから、そのピースで改めてドラッグを開始する）
       td.addEventListener('touchstart', (e)=>{
         if(!G.pendingMove || G.cur !== G.myColor) return;
         const grabbed = G.pendingMove.pcs.some(([pr,pc])=>pr===r&&pc===c);
         if(!grabbed) return;
         e.preventDefault();
-        startBoardDrag(r, c, e.touches[0]);
+        const pm = G.pendingMove;
+        G.pendingMove = null;
+        startPieceDrag(pm.id, e.touches[0], pm.rot, pm.flip);
       }, { passive:false });
 
       cells2d[r][c] = td;
@@ -503,28 +507,14 @@ const cells2d = [];
    回転・反転ボタンで向きを直してから、もう一度ドラッグして動かせる。
    ========================================================= */
 
-function startPieceDrag(id, touch){
+function startPieceDrag(id, touch, rot, flip){
   G.pendingMove = null;
-  G.selId = id; G.rot = 0; G.flip = false;
-  G.dragOffsetR = 0; G.dragOffsetC = 0;
+  G.selId = id;
+  G.rot = (rot !== undefined) ? rot : 0;
+  G.flip = (flip !== undefined) ? flip : false;
   G.dragging = true;
+  activeDragTouchId = touch.identifier;
   renderPieces();
-  renderBoard();
-  createDragGhost();
-  moveDragGhost(touch.clientX, touch.clientY);
-}
-
-//盤面上に仮置き済みのピースをつかんで動かす
-function startBoardDrag(grabR, grabC, touch){
-  const pm = G.pendingMove;
-  G.selId = pm.id;
-  G.rot = pm.rot;
-  G.flip = pm.flip;
-  G.dragOffsetR = grabR - pm.r;
-  G.dragOffsetC = grabC - pm.c;
-  G.pendingMove = null;
-  G.dragging = true;
-  G.hoverR = grabR; G.hoverC = grabC;
   renderBoard();
   createDragGhost();
   moveDragGhost(touch.clientX, touch.clientY);
@@ -574,11 +564,18 @@ function removeDragGhost(){
   if(ghost) ghost.remove();
 }
 
+function findTouchById(touchList, id){
+  for(let i=0;i<touchList.length;i++){
+    if(touchList[i].identifier === id) return touchList[i];
+  }
+  return null;
+}
+
 document.addEventListener('touchmove', (e)=>{
   if(!G.dragging) return;
   e.preventDefault();
 
-  const touch = e.touches[0];
+  const touch = findTouchById(e.touches, activeDragTouchId) || e.touches[0];
   moveDragGhost(touch.clientX, touch.clientY);
 
   const el = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -591,31 +588,33 @@ document.addEventListener('touchmove', (e)=>{
   renderBoard();
 }, { passive:false });
 
+//盤面のマス(r,c)を、そのままピースの原点(0,0)としてドロップする
 function finishDrag(){
   G.dragging = false;
+  activeDragTouchId = null;
   removeDragGhost();
 
   if(G.hoverR>=0 && G.selId!==null){
-    const anchorR = G.hoverR - G.dragOffsetR;
-    const anchorC = G.hoverC - G.dragOffsetC;
-    const pcs = getPlaced(anchorR, anchorC, G.selId, G.rot);
+    const pcs = getPlaced(G.hoverR, G.hoverC, G.selId, G.rot);
     const valid = isValid(G.cur, pcs);
-    G.pendingMove = { r:anchorR, c:anchorC, id:G.selId, rot:G.rot, flip:G.flip, pcs, valid };
+    G.pendingMove = { r:G.hoverR, c:G.hoverC, id:G.selId, rot:G.rot, flip:G.flip, pcs, valid };
   }
   G.hoverR=-1; G.hoverC=-1;
-  G.dragOffsetR = 0; G.dragOffsetC = 0;
   render();
 }
 
+//ドラッグに使っていた指が離れた時だけドロップ確定する（他の指のタッチは無視）
 document.addEventListener('touchend', (e)=>{
   if(!G.dragging) return;
-  if(e.touches.length > 0) return; //まだ指が残っていれば継続
+  const ended = findTouchById(e.changedTouches, activeDragTouchId);
+  if(!ended) return;
   finishDrag();
 });
 
 document.addEventListener('touchcancel', (e)=>{
   if(!G.dragging) return;
-  if(e.touches.length > 0) return;
+  const ended = findTouchById(e.changedTouches, activeDragTouchId);
+  if(!ended) return;
   finishDrag();
 });
 
@@ -641,9 +640,7 @@ function doConfirm(){
 function renderBoard() {
   let pre=[], preOk=false;
   if(G.selId!==null && G.hoverR>=0){
-    const anchorR = G.hoverR - (G.dragOffsetR||0);
-    const anchorC = G.hoverC - (G.dragOffsetC||0);
-    pre   = getPlaced(anchorR,anchorC,G.selId,G.rot);
+    pre   = getPlaced(G.hoverR,G.hoverC,G.selId,G.rot);
     preOk = isValid(G.cur, pre);
   }
   const preSet = new Set(pre.map(([r,c])=>r+','+c));
@@ -963,6 +960,9 @@ function maybeRunCOM(){
    結果表示
    ========================================================= */
 
+//色スロット(1〜4)に対応する絵文字。結果画面で「誰が何色だったか」を分かりやすくするため
+const COLOR_EMOJI = { 1:'🔴', 2:'🔵', 3:'🟢', 4:'🟡' };
+
 function showResult(){
   const sc = {};
   const placedCount = {};
@@ -995,12 +995,13 @@ function showResult(){
     const rank = idx + 1;
     const badge = (rank === 1) ? '🥇' : (rank === 2) ? '🥈' : (rank === 3) ? '🥉' : (rank + '位');
     const nm = G.names[p] || NAMES[p];
+    const colorEmoji = COLOR_EMOJI[p] || '';
 
     const row = document.createElement('div');
     row.className = 'result-row' + (rank === 1 ? ' winner' : '');
 
     const line1 = document.createElement('div');
-    line1.textContent = `${badge} 第${rank}位：${nm}`;
+    line1.textContent = `${badge} 第${rank}位：${colorEmoji} ${nm}`;
     const line2 = document.createElement('div');
     line2.textContent = `得点：${sc[p]} pt（${placedCount[p]}個配置）`;
 
