@@ -396,9 +396,12 @@ function autoFitZoom(){
   if(!el) return;
   el.style.transform = 'scale(1)';
   requestAnimationFrame(()=>{
-    const rect = el.getBoundingClientRect();
-    if(rect.width===0 || rect.height===0) return;
-    const rawScale = Math.min(window.innerWidth/rect.width, window.innerHeight/rect.height, 1);
+    //getBoundingClientRectだと、盤面がコンテナからはみ出している時に
+    //「はみ出した分」を無視してしまい正しく測れないため、scrollWidth/Heightを使う
+    const w = el.scrollWidth;
+    const h = el.scrollHeight;
+    if(w===0 || h===0) return;
+    const rawScale = Math.min(window.innerWidth/w, window.innerHeight/h, 1);
     const MARGIN_RATIO = 0.88; //ぴったりフィットさせず、あえて88%に収めて周囲に均等な余白を作る
     const scale = rawScale * MARGIN_RATIO;
     setZoom(Math.max(scale, 0.25));
