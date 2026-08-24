@@ -62,8 +62,6 @@ let activeDragTouchId = null;
 let isTouchDevice = false;
 document.addEventListener('touchstart', ()=>{ isTouchDevice = true; }, { passive:true, capture:true });
 
-function dbg(s){ console.log(s); }
-
 /* =========================================================
    ロビー機能（部屋の作成・参加は「先着で番号が決まる」方式）
    ========================================================= */
@@ -395,17 +393,31 @@ function autoFitZoom(){
   const el = document.getElementById('gameArea');
   if(!el) return;
   el.style.transform = 'scale(1)';
-  requestAnimationFrame(()=>{
-    //getBoundingClientRectだと、盤面がコンテナからはみ出している時に
-    //「はみ出した分」を無視してしまい正しく測れないため、scrollWidth/Heightを使う
-    const w = el.scrollWidth;
-    const h = el.scrollHeight;
-    if(w===0 || h===0) return;
-    const rawScale = Math.min(window.innerWidth/w, window.innerHeight/h, 1);
-    const MARGIN_RATIO = 0.88; //ぴったりフィットさせず、あえて88%に収めて周囲に均等な余白を作る
-    const scale = rawScale * MARGIN_RATIO;
-    setZoom(Math.max(scale, 0.25));
-  });
+  //display:noneから表示に切り替えた直後などはレイアウトがまだ確定しておらず、
+  //1回のrequestAnimationFrameだとscrollWidth/Heightが0のまま測ってしまうことがある。
+  //その場合は測れるようになるまで数フレーム待ってからリトライする（サイズが取れないまま
+  //諦めると、盤面が原寸のままはみ出して「中央揃えになっていない」ように見えてしまう）。
+  requestAnimationFrame(()=>requestAnimationFrame(()=>measureAndFit(el, 0)));
+}
+
+function measureAndFit(el, attempt){
+  //#gameAreaはalign-items:centerで#boardWrap（盤面）を中央寄せしているため、
+  //盤面が#gameAreaより横に大きいと左右に均等にはみ出す。scrollWidthは要素の
+  //開始側（左）へのはみ出しを含まないため、#gameArea.scrollWidthだけで測ると
+  //実際の横幅より小さく出てしまい、縮小が足りずスマホで画面からはみ出す
+  //（＝盤面が中央に見えない）原因になる。盤面自体の幅は#boardWrapで正しく測れる。
+  const boardWrap = document.getElementById('boardWrap');
+  const w = boardWrap ? Math.max(boardWrap.scrollWidth, el.scrollWidth) : el.scrollWidth;
+  const h = el.scrollHeight;
+  if((w===0 || h===0) && attempt < 10){
+    requestAnimationFrame(()=>measureAndFit(el, attempt+1));
+    return;
+  }
+  if(w===0 || h===0) return;
+  const rawScale = Math.min(window.innerWidth/w, window.innerHeight/h, 1);
+  const MARGIN_RATIO = 0.88; //ぴったりフィットさせず、あえて88%に収めて周囲に均等な余白を作る
+  const scale = rawScale * MARGIN_RATIO;
+  setZoom(Math.max(scale, 0.25));
 }
 window.addEventListener('resize', ()=>{ if(G.roomStatus==='playing') autoFitZoom(); });
 

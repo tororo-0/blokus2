@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <!-- 2本指ピンチでの拡大縮小を利用できるよう、user-scalable/maximum-scaleの制限は外しています -->
   <title>Blokus Online</title>
   <link rel="stylesheet" href="styles.css">
@@ -13,20 +13,21 @@
 <div id="lobby">
   <h1>Blokus オンライン対戦</h1>
 
-  <div id="lobby-entry">
+  <div id="lobby-entry" class="card">
     <button class="game-button-wide" onclick="createRoom()">部屋を作る</button>
     <div class="join-row">
-      <input id="roomCodeInput" placeholder="部屋コード（5文字）" maxlength="5">
+      <input id="roomCodeInput" placeholder="部屋コード" maxlength="5">
       <button class="game-button-wide" onclick="joinRoomFromInput()">参加する</button>
     </div>
     <p id="lobbyMsg"></p>
   </div>
 
   <div id="lobby-room" style="display:none;">
-    <h3>部屋コード: <span id="roomCodeDisplay"></span></h3>
-
-    <button id="copyInviteBtn" onclick="copyInviteMessage()">📋 招待メッセージをコピー</button>
-    <span id="copyMsg"></span>
+    <div class="card">
+      <h3 style="margin:0 0 10px;font-size:15px;color:var(--text-secondary);font-weight:600;">部屋コード：<span id="roomCodeDisplay" style="color:var(--text);font-size:18px;letter-spacing:2px;"></span></h3>
+      <button id="copyInviteBtn" onclick="copyInviteMessage()">📋 招待メッセージをコピー</button>
+      <span id="copyMsg"></span>
+    </div>
 
     <div id="mySeatPanel">
       <label>あなたの名前：</label>
@@ -36,7 +37,7 @@
     </div>
 
     <div id="seatList"></div>
-    <button id="startBtn" onclick="startGame()" style="display:none;">ゲーム開始</button>
+    <button id="startBtn" class="game-button-wide" onclick="startGame()" style="display:none;">ゲーム開始</button>
     <p class="hint">ホストが「ゲーム開始」を押すと、空席には自動でCPUが入り、プレイヤーの色（手番順）はランダムに決まります。</p>
   </div>
 </div>
@@ -53,11 +54,11 @@
     </div>
 
     <div class="control-row">
-        <button id="confirmBtn" class="game-button confirm-button" onclick="doConfirm()" style="display:none;">確定</button>
-        <button class="game-button" onclick="doRotate()">回転(R)</button>
-        <button class="game-button" onclick="doFlip()">反転(F)</button>
-        <button id="deselectBtn" class="game-button" onclick="doDeselect()" style="display:none;">選択解除</button>
-        <button class="game-button end-button" onclick="endGame()">終了</button>
+        <button class="game-button" onclick="doRotate()">🔄<br>回転</button>
+        <button class="game-button" onclick="doFlip()">↩️<br>反転</button>
+        <button id="deselectBtn" class="game-button" onclick="doDeselect()" style="display:none;">❌<br>解除</button>
+        <button id="confirmBtn" class="game-button confirm-button" onclick="doConfirm()" style="display:none;">✅<br>確定</button>
+        <button class="game-button end-button" onclick="endGame()">🏁<br>終了</button>
     </div>
 
     <div id="boardWrap">

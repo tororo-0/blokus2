@@ -1,69 +1,140 @@
+:root {
+   --accent: #007aff;
+   --accent-dark: #0062cc;
+   --success: #34c759;
+   --danger: #ff3b30;
+   --warning: #ffb300;
+   --bg: #f2f2f7;
+   --card: #ffffff;
+   --text: #1c1c1e;
+   --text-secondary: #8e8e93;
+   --border: #e5e5ea;
+   --radius-lg: 18px;
+   --radius-md: 14px;
+   --radius-sm: 10px;
+   --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+   --shadow-float: 0 6px 20px rgba(0,0,0,0.18);
+   --safe-b: env(safe-area-inset-bottom, 0px);
+   --safe-t: env(safe-area-inset-top, 0px);
+}
+
+* { box-sizing: border-box; }
+
 body {
-   font-family: monospace;
-   padding: 10px;
-   background: #f5f5f5;
+   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Segoe UI", sans-serif;
+   -webkit-font-smoothing: antialiased;
+   padding: calc(16px + var(--safe-t)) 16px 16px;
+   background: var(--bg);
+   color: var(--text);
    margin: 0;
    min-height: 100vh;
    box-sizing: border-box;
    overflow-x: hidden;
 }
 
+button, input {
+   font-family: inherit;
+   -webkit-tap-highlight-color: transparent;
+}
+button { touch-action: manipulation; }
+
 /* 画面中央（自動フィット用のtransformはJSから設定） */
 .game-area {
    display: flex;
    flex-direction: column;
    align-items: center;
-   justify-content: center;
+   justify-content: flex-start;
    width: 100%;
    box-sizing: border-box;
    transform: scale(1);
    transform-origin: top center;
    transition: transform 0.2s;
+   padding-bottom: calc(84px + var(--safe-b));
 }
 
 /* ===== ロビー画面 ===== */
 #lobby {
-   max-width: 480px;
-   margin: 30px auto;
+   max-width: 420px;
+   margin: 12px auto;
    text-align: center;
 }
-#lobby h1 { font-size: 24px; margin-bottom: 20px; }
-.join-row { display: flex; gap: 8px; justify-content: center; margin: 16px 0; }
+#lobby h1 {
+   font-size: 22px;
+   font-weight: 700;
+   margin: 8px 0 20px;
+   letter-spacing: -0.02em;
+}
+
+.card {
+   background: var(--card);
+   border-radius: var(--radius-lg);
+   box-shadow: var(--shadow-card);
+   padding: 18px;
+}
+
+.join-row {
+   display: flex;
+   gap: 8px;
+   margin: 14px 0 4px;
+}
 .join-row input {
-   font-family: monospace;
-   font-size: 18px;
-   padding: 8px;
-   width: 160px;
+   flex: 1;
+   min-width: 0;
+   font-family: "SF Mono", ui-monospace, Menlo, monospace;
+   font-size: 17px;
+   padding: 12px 10px;
+   width: auto;
    text-transform: uppercase;
    letter-spacing: 2px;
+   border: none;
+   background: var(--bg);
+   border-radius: var(--radius-sm);
+   color: var(--text);
 }
+.join-row input::placeholder { color: var(--text-secondary); letter-spacing: 0; }
+.join-row input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 .game-button-wide {
    cursor: pointer;
-   background-color: #f5f5f5;
-   border: 2px solid #000000;
-   border-radius: 6px;
-   padding: 10px 20px;
+   background-color: var(--accent);
+   color: #fff;
+   border: none;
+   border-radius: var(--radius-md);
+   padding: 14px 20px;
    font-size: 16px;
+   font-weight: 600;
+   width: 100%;
    margin: 6px 0;
+   transition: opacity 0.15s;
 }
-#lobbyMsg { color: #d32f2f; font-size: 14px; }
-.hint { color: #777; font-size: 13px; }
+.game-button-wide:active { opacity: 0.7; }
+.join-row .game-button-wide { width: auto; flex-shrink: 0; padding: 12px 18px; margin: 0; }
+
+#lobbyMsg { color: var(--danger); font-size: 13px; min-height: 16px; margin-top: 8px; }
+.hint { color: var(--text-secondary); font-size: 12px; margin-top: 14px; line-height: 1.5; }
+
+#lobby-room .card + .card { margin-top: 12px; }
 
 #copyInviteBtn {
-   padding: 8px 16px;
-   margin-bottom: 12px;
+   padding: 10px 16px;
+   margin-bottom: 4px;
    cursor: pointer;
-   border-radius: 6px;
-   border: 1px solid #999;
+   border-radius: var(--radius-sm);
+   border: none;
+   background: var(--bg);
+   color: var(--accent);
+   font-weight: 600;
+   font-size: 14px;
 }
-#copyMsg { color: green; margin-left: 8px; font-size: 13px; }
+#copyInviteBtn:active { opacity: 0.6; }
+#copyMsg { color: var(--success); margin-left: 8px; font-size: 13px; font-weight: 600; }
 
 #mySeatPanel {
-   background: #fff;
-   border: 1px solid #ddd;
-   border-radius: 8px;
-   padding: 12px;
-   margin: 16px 0;
+   background: var(--card);
+   border-radius: var(--radius-lg);
+   box-shadow: var(--shadow-card);
+   padding: 14px;
+   margin: 12px 0;
    display: flex;
    flex-wrap: wrap;
    gap: 8px;
@@ -72,114 +143,148 @@ body {
    font-size: 14px;
 }
 #myNameInput {
-   font-family: monospace;
-   font-size: 14px;
-   padding: 6px;
+   font-size: 15px;
+   padding: 9px 10px;
    width: 120px;
+   border: none;
+   background: var(--bg);
+   border-radius: var(--radius-sm);
+   color: var(--text);
 }
 #mySeatPanel button {
    cursor: pointer;
-   border-radius: 6px;
-   border: 1px solid #999;
-   padding: 6px 10px;
+   border-radius: var(--radius-sm);
+   border: none;
+   padding: 9px 14px;
    font-size: 13px;
-   background: #fff;
+   font-weight: 600;
+   background: var(--bg);
+   color: var(--text);
 }
-#readyBtn { background: #e8f5e9; border-color: #4caf50; }
+#mySeatPanel button:active { opacity: 0.6; }
+#mySeatPanel button#readyBtn { background: var(--success); color: #fff; }
 
-#seatList { display: flex; flex-direction: column; gap: 6px; margin: 16px 0; }
+#seatList { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .seat-row {
-   border: 2px solid #ddd;
-   border-radius: 6px;
-   padding: 10px;
-   background: #ffffff;
+   border: none;
+   border-radius: var(--radius-md);
+   padding: 12px 14px;
+   background: var(--card);
+   box-shadow: var(--shadow-card);
    font-size: 14px;
    text-align: left;
 }
-.seat-row.mine { background: #fffbe6; font-weight: bold; border-color: #e0c200; }
-.seat-row.empty { color: #999; }
+.seat-row.mine { background: #fff7db; box-shadow: inset 0 0 0 1.5px var(--warning); font-weight: 600; }
+.seat-row.empty { color: var(--text-secondary); box-shadow: none; background: transparent; border: 1.5px dashed var(--border); }
+
+#startBtn { margin-top: 14px; }
 
 /* ===== ターン切り替えの中央演出 ===== */
 .turn-announce {
    position: fixed;
    top: 38%;
    left: 50%;
-   transform: translate(-50%, -50%);
-   font-size: 34px;
-   font-weight: bold;
-   color: #333;
-   background: rgba(255,255,255,0.92);
-   padding: 16px 26px;
-   border-radius: 14px;
-   box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+   transform: translate(-50%, -50%) scale(0.95);
+   font-size: 30px;
+   font-weight: 700;
+   color: var(--text);
+   background: rgba(255,255,255,0.9);
+   -webkit-backdrop-filter: blur(16px);
+   backdrop-filter: blur(16px);
+   padding: 18px 30px;
+   border-radius: var(--radius-lg);
+   box-shadow: var(--shadow-float);
    opacity: 0;
    pointer-events: none;
-   transition: opacity 0.4s ease;
+   transition: opacity 0.35s ease, transform 0.35s ease;
    z-index: 200;
    text-align: center;
    max-width: 80vw;
 }
-.turn-announce.show { opacity: 1; }
+.turn-announce.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
 /* ===== 残り時間タイマー（右上固定） ===== */
 .timer-label {
    position: fixed;
-   top: 8px;
-   right: 8px;
-   background: #333;
+   top: calc(10px + var(--safe-t));
+   right: 10px;
+   background: rgba(28,28,30,0.85);
    color: #fff;
-   padding: 4px 10px;
-   border-radius: 12px;
-   font-size: 14px;
+   padding: 6px 12px;
+   border-radius: 999px;
+   font-size: 13px;
+   font-weight: 600;
+   font-variant-numeric: tabular-nums;
    z-index: 60;
+   box-shadow: var(--shadow-card);
 }
-.timer-label.low { background: #d32f2f; }
+.timer-label.low { background: var(--danger); }
 
-.myseat { font-size: 15px; margin-left: 6px; display: block; }
+.myseat { font-size: 13px; color: var(--text-secondary); display: block; margin-top: 2px; }
 
 .turn-area {
-   font-size: 26px;
+   font-size: 20px;
+   font-weight: 700;
    display: flex;
-   flex-wrap: wrap;
+   flex-direction: column;
    align-items: center;
    justify-content: center;
-   gap: 4px;
+   gap: 0;
    text-align: center;
-   margin-top: 4px;
+   margin: 4px 0 14px;
+   width: 100%;
 }
 
 .control-row {
+   position: fixed;
+   left: 0;
+   right: 0;
+   bottom: 0;
    display: flex;
-   gap: 6px;
-   margin: 8px 0;
-   flex-wrap: wrap;
+   gap: 8px;
+   margin: 0;
+   padding: 10px 12px calc(10px + var(--safe-b));
+   background: rgba(255,255,255,0.92);
+   -webkit-backdrop-filter: blur(16px);
+   backdrop-filter: blur(16px);
+   border-top: 1px solid var(--border);
    justify-content: center;
+   z-index: 90;
 }
 
-#boardWrap { position: relative; overflow: visible; max-width: 100%; }
+#boardWrap {
+   position: relative;
+   overflow: visible;
+   background: var(--card);
+   border-radius: var(--radius-lg);
+   padding: 10px;
+   box-shadow: var(--shadow-card);
+}
 
 /* ===== 盤面上に出るフローティング操作ボタン ===== */
 .floating-controls {
    position: absolute;
    display: flex;
    gap: 4px;
-   background: rgba(255,255,255,0.95);
-   border: 1px solid #999;
-   border-radius: 8px;
-   padding: 3px;
+   background: rgba(255,255,255,0.96);
+   -webkit-backdrop-filter: blur(10px);
+   backdrop-filter: blur(10px);
+   border: none;
+   border-radius: var(--radius-md);
+   padding: 4px;
    z-index: 80;
-   box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+   box-shadow: var(--shadow-float);
 }
 .floating-controls button {
-   width: 32px;
-   height: 32px;
+   width: 34px;
+   height: 34px;
    font-size: 16px;
    border: none;
    background: transparent;
    cursor: pointer;
-   border-radius: 6px;
+   border-radius: var(--radius-sm);
 }
-.floating-controls button:active { background: #eee; }
+.floating-controls button:active { background: var(--bg); }
 .floating-controls button:disabled {
    opacity: 0.35;
    cursor: not-allowed;
@@ -192,44 +297,50 @@ body {
    transform: translate(-50%, -50%);
    pointer-events: none;
    z-index: 300;
-   background: rgba(255,255,255,0.9);
-   border: 2px solid #333;
-   border-radius: 6px;
+   background: rgba(255,255,255,0.92);
+   border: none;
+   border-radius: var(--radius-sm);
    padding: 4px;
-   opacity: 0.85;
+   opacity: 0.9;
+   box-shadow: var(--shadow-float);
 }
 .drag-ghost table { border-collapse: collapse; }
-.drag-ghost td { width: 20px; height: 20px; border: 1px solid #ddd; }
+.drag-ghost td { width: 20px; height: 20px; border: 1px solid var(--border); }
 
 /* ===== 結果画面 ===== */
 #resultScreen {
-   max-width: 480px;
-   margin: 30px auto;
+   max-width: 420px;
+   margin: 12px auto calc(24px + var(--safe-b));
    text-align: center;
-   padding: 0 10px;
+   padding: 0;
 }
-#resultScreen h1 { font-size: 26px; margin-bottom: 8px; }
-#resultScreen h3 { font-size: 16px; margin: 16px 0 8px; }
+#resultScreen h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+#resultScreen h3 { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin: 20px 0 10px; }
 .result-row {
-   border: 2px solid #ddd;
-   border-radius: 6px;
-   padding: 8px 12px;
-   margin: 6px 0;
+   border: none;
+   border-radius: var(--radius-md);
+   padding: 10px 14px;
+   margin: 8px 0;
    text-align: left;
    font-size: 14px;
-   background: #fff;
+   background: var(--card);
+   box-shadow: var(--shadow-card);
 }
-.result-row.winner { border-color: #ffb300; background: #fff8e1; font-weight: bold; }
+.result-row.winner { box-shadow: inset 0 0 0 1.5px var(--warning); background: #fff8e1; font-weight: 700; }
 #resultBoardWrap {
    display: flex;
    justify-content: center;
-   margin: 12px 0;
+   margin: 12px 0 20px;
    overflow: auto;
+   background: var(--card);
+   border-radius: var(--radius-lg);
+   box-shadow: var(--shadow-card);
+   padding: 10px;
 }
 #resultBoardTable { border-collapse: collapse; }
 #resultBoardTable td {
    width: 12px; height: 12px;
-   border: 1px solid #eee;
+   border: 1px solid var(--border);
    box-sizing: border-box;
 }
 
@@ -246,83 +357,113 @@ body {
    max-width: 28px;
    max-height: 28px;
    box-sizing: border-box;
-   border: 1px solid hsl(0, 0%, 73%);
+   border: 1px solid #eceef0;
    background: #ffffff;
    cursor: pointer;
 }
-#board td.p1 { background: #ff0015; }
-#board td.p2 { background: #008cff; }
-#board td.p3 { background: #00ff08; }
+#board td.p1 { background: #e63946; }
+#board td.p2 { background: #2196f3; }
+#board td.p3 { background: #4caf50; }
 #board td.p4 { background: #ff9800; }
 #board td.pre { opacity: 0.4; }
-#board td.bad { background: #727272 !important; opacity: 1; }
-#board td.corner1 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(230, 57, 70, 40%);}
-#board td.corner2 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(33, 150, 243, 40%);}
-#board td.corner3 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(76, 175, 80, 40%);}
-#board td.corner4 { outline: 3px dashed #555555; outline-offset: -3px; background-color: rgb(255, 152, 0, 40%);}
+#board td.bad { background: #b0b3b8 !important; opacity: 1; }
+#board td.corner1 { outline: 3px dashed #8b8d90; outline-offset: -3px; background-color: rgba(230, 57, 70, 0.25); }
+#board td.corner2 { outline: 3px dashed #8b8d90; outline-offset: -3px; background-color: rgba(33, 150, 243, 0.25); }
+#board td.corner3 { outline: 3px dashed #8b8d90; outline-offset: -3px; background-color: rgba(76, 175, 80, 0.25); }
+#board td.corner4 { outline: 3px dashed #8b8d90; outline-offset: -3px; background-color: rgba(255, 152, 0, 0.25); }
 
-#pieces { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0; justify-content: center; }
-.pbtn { cursor: pointer; border: none; padding: 4px; background: #f5f5f5; border-radius: 4px; }
-.pbtn.sel { border: 3px solid #000000; }
+#pieces {
+   display: flex;
+   gap: 8px;
+   flex-wrap: wrap;
+   margin: 14px 0;
+   justify-content: center;
+   background: var(--card);
+   border-radius: var(--radius-lg);
+   box-shadow: var(--shadow-card);
+   padding: 12px;
+   width: 100%;
+   max-width: 560px;
+}
+.pbtn {
+   cursor: pointer;
+   border: none;
+   padding: 6px;
+   background: var(--bg);
+   border-radius: var(--radius-sm);
+   transition: box-shadow 0.12s, background 0.12s;
+}
+.pbtn:active { background: var(--border); }
+.pbtn.sel { box-shadow: inset 0 0 0 2.5px var(--accent); background: #eaf3ff; }
 .pbtn table { border-collapse: collapse; }
-.pbtn td { width: 13px; height: 13px; border: 1px solid #f5f5f5; }
+.pbtn td { width: 13px; height: 13px; border: 1px solid var(--bg); }
 
 .game-button {
-   margin: 1px;
+   margin: 0;
    cursor: pointer;
-   background-color: #f5f5f5;
-   border-color: #000000;
-   border-radius: 4px;
-   height: 52px;
-   width: 52px;
+   background-color: var(--bg);
+   color: var(--text);
+   border: none;
+   border-radius: var(--radius-sm);
+   height: 48px;
+   flex: 1;
+   min-width: 0;
+   max-width: 84px;
    font-size: 12px;
+   font-weight: 600;
 }
+.game-button:active { opacity: 0.6; }
 .end-button {
-   background-color: #ffe0e0;
-   border-color: #d32f2f;
-   color: #d32f2f;
+   background-color: rgba(255,59,48,0.12);
+   color: var(--danger);
 }
 .confirm-button {
-   background-color: #4caf50;
+   background-color: var(--success);
    color: white;
-   font-weight: bold;
-   border-color: #388e3c;
+   font-weight: 700;
 }
 .confirm-button:disabled {
-   background-color: #ccc;
-   border-color: #aaa;
+   background-color: var(--border);
+   color: var(--text-secondary);
    cursor: not-allowed;
 }
 
 /* ===== 相手の残りピース表示 ===== */
 #opponentBar {
    display: flex;
-   gap: 6px;
+   gap: 8px;
    flex-wrap: wrap;
    justify-content: center;
-   margin-top: 10px;
+   margin-top: 14px;
+   width: 100%;
 }
 .opp-btn {
-   border: 2px solid #999;
-   border-radius: 6px;
-   padding: 6px 8px;
+   border: none;
+   border-radius: 999px;
+   padding: 7px 12px;
    font-size: 12px;
+   font-weight: 600;
    cursor: pointer;
-   background: #fff;
-   max-width: 72px;
+   background: var(--card);
+   box-shadow: var(--shadow-card);
+   max-width: 84px;
    overflow: hidden;
    text-overflow: ellipsis;
    white-space: nowrap;
 }
-.opp-btn.open { font-weight: bold; }
+.opp-btn.open { box-shadow: inset 0 0 0 2px currentColor; }
 #opponentPieces {
    display: flex;
    gap: 6px;
    flex-wrap: wrap;
    justify-content: center;
-   margin-top: 8px;
+   margin-top: 10px;
    max-width: 90vw;
+   background: var(--card);
+   border-radius: var(--radius-md);
+   box-shadow: var(--shadow-card);
+   padding: 10px;
 }
-.opp-piece { padding: 3px; background: #fafafa; border-radius: 4px; }
+.opp-piece { padding: 3px; background: var(--bg); border-radius: var(--radius-sm); }
 .opp-piece table { border-collapse: collapse; }
-.opp-piece td { width: 10px; height: 10px; border: 1px solid #eee; }
+.opp-piece td { width: 10px; height: 10px; border: 1px solid var(--card); }
