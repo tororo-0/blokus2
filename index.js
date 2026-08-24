@@ -935,14 +935,16 @@ function validCheck() {
   let canPlace = false;
   outer:
   for (const id of G.remain[p]) {
-    for (let rot = 0; rot < 4; rot++) {
-      for (let r = 0; r < SIZE; r++) {
-        for (let c = 0; c < SIZE; c++) {
-          const pcs = getPlaced(r, c, id, rot);
-          if (pcs.some(([pr, pc]) => pr < 0 || pr >= SIZE || pc < 0 || pc >= SIZE)) continue;
-          if (isValid(p, pcs)) {
-            canPlace = true;
-            break outer;
+    for (const flip of [false, true]) {
+      for (let rot = 0; rot < 4; rot++) {
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            const pcs = getPlaced(r, c, id, rot, flip);
+            if (pcs.some(([pr, pc]) => pr < 0 || pr >= SIZE || pc < 0 || pc >= SIZE)) continue;
+            if (isValid(p, pcs)) {
+              canPlace = true;
+              break outer;
+            }
           }
         }
       }
@@ -987,12 +989,14 @@ function findAnyValidMove(p){
   });
 
   for(const id of sortedRemain){
-    for(let rot=0; rot<4; rot++){
-      for(let r=0; r<SIZE; r++){
-        for(let c=0; c<SIZE; c++){
-          const pcs = getPlaced(r, c, id, rot);
-          if(pcs.some(([pr,pc]) => pr<0 || pr>=SIZE || pc<0 || pc>=SIZE)) continue;
-          if(isValid(p, pcs)) return {id, rot, r, c};
+    for(const flip of [false, true]){
+      for(let rot=0; rot<4; rot++){
+        for(let r=0; r<SIZE; r++){
+          for(let c=0; c<SIZE; c++){
+            const pcs = getPlaced(r, c, id, rot, flip);
+            if(pcs.some(([pr,pc]) => pr<0 || pr>=SIZE || pc<0 || pc>=SIZE)) continue;
+            if(isValid(p, pcs)) return {id, rot, r, c, flip};
+          }
         }
       }
     }
@@ -1012,9 +1016,15 @@ function maybeRunCOM(){
     comRunning = false;
     if(!isCOM(G.cur) || G.roomStatus!=='playing') return;
     const move = findAnyValidMove(G.cur);
-    if(!move) return;
+    if(!move){
+      //置ける場所が本当にどこにもない場合。ここで何もせず抜けると誰も手番を進められず
+      //ゲームが永久に止まってしまう（＝全部置けても結果画面に進まない原因になる）ため、
+      //人間の手番と同じくパス扱いにして次の手番へ進める。
+      doPass();
+      return;
+    }
 
-    const pcs = getPlaced(move.r, move.c, move.id, move.rot);
+    const pcs = getPlaced(move.r, move.c, move.id, move.rot, move.flip);
     pcs.forEach(([rr,cc])=>G.board[rr][cc]=G.cur);
     G.first[G.cur]=false;
     const idx=G.remain[G.cur].indexOf(move.id);
