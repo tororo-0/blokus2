@@ -398,8 +398,9 @@ function autoFitZoom(){
   requestAnimationFrame(()=>{
     const rect = el.getBoundingClientRect();
     if(rect.width===0 || rect.height===0) return;
-    const availW = window.innerWidth - 12;
-    const availH = window.innerHeight - 12;
+    const marginPx = 36; //盤面のまわりに確保する余白（片側あたり約18px）
+    const availW = window.innerWidth - marginPx;
+    const availH = window.innerHeight - marginPx;
     const scale = Math.min(availW/rect.width, availH/rect.height, 1);
     setZoom(Math.max(scale, 0.25));
   });
