@@ -56,6 +56,12 @@ let seatsCache = {};
 let lastCur = null;
 let activeDragTouchId = null;
 
+//一度でも画面をタップしたら true にする。
+//スマホのSafariはタップ後にPC向けのmouseenter等を疑似的に発火することがあり、
+//それによる「二重プレビュー」を防ぐためのフラグ。
+let isTouchDevice = false;
+document.addEventListener('touchstart', ()=>{ isTouchDevice = true; }, { passive:true, capture:true });
+
 function dbg(s){ console.log(s); }
 
 /* =========================================================
@@ -404,9 +410,11 @@ window.addEventListener('resize', ()=>{ if(G.roomStatus==='playing') autoFitZoom
    ゲームロジック
    ========================================================= */
 
-function getShape(id, r){
+//flipを引数として明示的に受け取れるようにする。省略時は現在のG.flip（従来通りの挙動）。
+//これにより「今操作しているピース以外」の見た目にG.flipが漏れて影響することを防げる。
+function getShape(id, r, flip = G.flip){
   let cs = PDEFS[id].map(c=>[...c]);
-  if(G.flip){
+  if(flip){
     cs = cs.map(([r,c]) => [r,-c]);
     const mc =Math.min(...cs.map(([,c])=>c));
     cs = cs.map(([r,c])=>[r,c-mc]);
@@ -425,8 +433,8 @@ function getBaseShape(id){
   return PDEFS[id].map(c=>[...c]);
 }
 
-function getPlaced(br,bc,id,r){
-  return getShape(id,r).map(([dr,dc])=>[br+dr,bc+dc]);
+function getPlaced(br,bc,id,r,flip = G.flip){
+  return getShape(id,r,flip).map(([dr,dc])=>[br+dr,bc+dc]);
 }
 
 function isValid(p, cells){
@@ -471,6 +479,7 @@ const cells2d = [];
       });
 
       td.addEventListener('mouseenter', ()=>{
+        if(isTouchDevice) return; //スマホでのタップ後に疑似的に発火するmouseenterを無視（二重プレビュー防止）
         G.hoverR=r; G.hoverC=c;
         if (G.selId !== null) renderBoard();
       });
@@ -734,7 +743,8 @@ function renderPieces(){
     btn.className='pbtn'+(G.selId===id?' sel':'');
 
     const r2=G.selId===id?G.rot:0;
-    const sh=getShape(id,r2);
+    const flip2 = G.selId===id ? G.flip : false; //選択中のピース以外には反転を適用しない
+    const sh=getShape(id,r2,flip2);
     const mr=Math.max(...sh.map(([r])=>r));
     const mc=Math.max(...sh.map(([,c])=>c));
     const t=document.createElement('table');
@@ -1037,9 +1047,24 @@ function showResult(){
   boardWrap.innerHTML = '';
   boardWrap.appendChild(buildResultBoardTable(G.board));
 
+  //切り替わる前に残っている可能性のある表示（フローティングボタン・ドラッグ中のゴースト・
+  //ターン演出など）を確実に消しておく（iOS Safariの描画残りバグ対策）
+  G.dragging = false;
+  G.pendingMove = null;
+  G.selId = null;
+  removeDragGhost();
+  const fc = document.getElementById('floatingControls');
+  if(fc) fc.style.display = 'none';
+  const announce = document.getElementById('turnAnnounce');
+  if(announce) announce.classList.remove('show');
+  clearTimeout(turnAnnounceTimer);
+
   document.getElementById('lobby').style.display = 'none';
   document.getElementById('gameArea').style.display = 'none';
   document.getElementById('resultScreen').style.display = '';
+
+  //display:noneにした後、念のためもう一度スクロール位置を先頭に戻す
+  window.scrollTo(0, 0);
 }
 
 //最終盤面を、操作できない静止画として表示する
