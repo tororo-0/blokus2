@@ -699,6 +699,11 @@ function renderBoard() {
     }
   }
 
+  const deselectBtn = document.getElementById('deselectBtn');
+  if(deselectBtn){
+    deselectBtn.style.display = (G.cur === G.myColor && (G.selId !== null || G.pendingMove)) ? '' : 'none';
+  }
+
   positionFloatingControls();
 }
 
@@ -712,7 +717,7 @@ function positionFloatingControls(){
   }
   const pcs = G.pendingMove.pcs;
   const cell = 28;
-  const controlsWidth = 110;
+  const controlsWidth = 145;
   const boardPx = SIZE * cell;
 
   const minR = Math.min(...pcs.map(p=>p[0]));
@@ -890,6 +895,16 @@ function doFlip(){
   renderBoard();
 }
 document.addEventListener('keydown',e=>{ if(e.key==='f'||e.key==='F') doFlip(); });
+
+//選択中/仮置き中のピースを解除する（盤面には反映しない）
+function doDeselect(){
+  if(G.selId===null && !G.pendingMove) return;
+  G.selId = null;
+  G.pendingMove = null;
+  G.rot = 0; G.flip = false;
+  render();
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') doDeselect(); });
 
 //パス（置ける場所が本当にない時の自動パス専用。以後そのプレイヤーの番は回ってこない）
 function doPass(){
