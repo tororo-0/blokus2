@@ -49,7 +49,7 @@ button { touch-action: manipulation; }
    transform: scale(1);
    transform-origin: top center;
    transition: transform 0.2s;
-   padding-bottom: calc(84px + var(--safe-b));
+   padding-bottom: calc(16px + var(--safe-b));
 }
 
 /* ===== ロビー画面 ===== */
@@ -236,20 +236,16 @@ button { touch-action: manipulation; }
 }
 
 .control-row {
-   position: fixed;
-   left: 0;
-   right: 0;
-   bottom: 0;
    display: flex;
    gap: 8px;
-   margin: 0;
-   padding: 10px 12px calc(10px + var(--safe-b));
-   background: rgba(255,255,255,0.92);
-   -webkit-backdrop-filter: blur(16px);
-   backdrop-filter: blur(16px);
-   border-top: 1px solid var(--border);
+   margin: 4px 0 14px;
+   padding: 10px;
+   background: var(--card);
+   border-radius: var(--radius-lg);
+   box-shadow: var(--shadow-card);
    justify-content: center;
-   z-index: 90;
+   width: 100%;
+   max-width: 560px;
 }
 
 #boardWrap {

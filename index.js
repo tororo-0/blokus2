@@ -537,6 +537,7 @@ function startPieceDrag(id, touch, rot, flip){
   G.rot = (rot !== undefined) ? rot : 0;
   G.flip = (flip !== undefined) ? flip : false;
   G.dragging = true;
+  G.hoverR = -1; G.hoverC = -1; //前回操作の位置が残っていると、動かさずに指を離した時に意図しない場所へ仮置きされる
   activeDragTouchId = touch.identifier;
   renderPieces();
   renderBoard();
@@ -627,18 +628,21 @@ function finishDrag(){
   render();
 }
 
-//ドラッグに使っていた指が離れた時だけドロップ確定する（他の指のタッチは無視）
+//ドラッグに使っていた指が離れた時だけドロップ確定する（他の指のタッチは無視）。
+//ただし、識別子がずれてどの指のtouchendか判定できない場合でも、画面上の指が
+//全部離れているならドラッグは終わっているはずなので、取りこぼさず確定する
+//（ここで確定し損なうと、G.draggingが立ちっぱなしになり以後ボタン類が反応しなくなる）。
 document.addEventListener('touchend', (e)=>{
   if(!G.dragging) return;
   const ended = findTouchById(e.changedTouches, activeDragTouchId);
-  if(!ended) return;
+  if(!ended && e.touches.length > 0) return;
   finishDrag();
 });
 
 document.addEventListener('touchcancel', (e)=>{
   if(!G.dragging) return;
   const ended = findTouchById(e.changedTouches, activeDragTouchId);
-  if(!ended) return;
+  if(!ended && e.touches.length > 0) return;
   finishDrag();
 });
 
@@ -730,17 +734,18 @@ function positionFloatingControls(){
   const pcs = G.pendingMove.pcs;
   const cell = 28;
   const controlsWidth = 145;
+  const boardPad = 10; //#boardWrapのpadding（styles.cssと合わせる。ずれると盤面上のボタンが指した位置と合わなくなる）
   const boardPx = SIZE * cell;
 
   const minR = Math.min(...pcs.map(p=>p[0]));
   const minC = Math.min(...pcs.map(p=>p[1]));
   const maxC = Math.max(...pcs.map(p=>p[1]));
 
-  let left = (maxC + 1) * cell + 4;
-  if(left + controlsWidth > boardPx){
-    left = Math.max(0, minC * cell - controlsWidth - 4);
+  let left = boardPad + (maxC + 1) * cell + 4;
+  if(left + controlsWidth > boardPad + boardPx){
+    left = Math.max(0, boardPad + minC * cell - controlsWidth - 4);
   }
-  const top = Math.max(0, minR * cell);
+  const top = boardPad + Math.max(0, minR * cell);
 
   fc.style.left = left + 'px';
   fc.style.top = top + 'px';
