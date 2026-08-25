@@ -1135,7 +1135,10 @@ function validCheck() {
 }
 
 function nextTurn(){
-  const allDone=[1,2,3,4].every(p=>!G.active[p]||G.passed[p]||(G.remain[p]&&G.remain[p].length===0));
+  //誰か1人でも手持ちのピースを1つも余らせず全部置き切ったら、その時点で即ゲーム終了とする
+  //（一度も置けずにパスすることなく最後まで置き切るのは最高の結果であり、他のプレイヤーの決着を待つ必要がないため）
+  const perfectFinish = [1,2,3,4].some(p => G.active[p] && G.remain[p] && G.remain[p].length === 0);
+  const allDone = perfectFinish || [1,2,3,4].every(p=>!G.active[p]||G.passed[p]||(G.remain[p]&&G.remain[p].length===0));
   if(allDone){
     syncState();
     if(G.roomId) db.ref('rooms/'+G.roomId+'/status').set('finished');
