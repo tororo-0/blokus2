@@ -177,6 +177,26 @@ button { touch-action: manipulation; }
 .seat-row.mine { background: #fff7db; box-shadow: inset 0 0 0 1.5px var(--warning); font-weight: 600; }
 .seat-row.empty { color: var(--text-secondary); box-shadow: none; background: transparent; border: 1.5px dashed var(--border); }
 
+#comDifficultyList { display: flex; flex-direction: column; gap: 8px; }
+.com-diff-row {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   border: 1.5px dashed var(--border);
+   border-radius: var(--radius-md);
+   padding: 10px 14px;
+   font-size: 14px;
+   color: var(--text-secondary);
+}
+.com-diff-row select {
+   padding: 6px 10px;
+   border-radius: var(--radius-sm);
+   border: 1px solid var(--border);
+   background: var(--bg);
+   color: var(--text);
+   font-size: 14px;
+}
+
 #startBtn { margin-top: 14px; }
 
 /* ===== ターン切り替えの中央演出 ===== */

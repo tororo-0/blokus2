@@ -49,12 +49,12 @@ const G = {
   roomStatus: null, turnDeadline: null, timeoutTriggered: false,
   openedOpponent: null,
   dragging: false,
-  comDifficulty: 'normal',
+  comDifficulty: {}, //色スロット(1〜4) → 'easy'|'normal'|'hard'
 };
 
 let zoom = 1;
 let seatsCache = {};
-let comDifficultyCache = 'normal';
+let comDifficultyCache = {1:'normal',2:'normal',3:'normal',4:'normal'}; //ロビー番号(1〜4) → 強さ
 let lastCur = null;
 let activeDragTouchId = null;
 
@@ -80,7 +80,7 @@ function createRoom(){
   db.ref('rooms/'+code).set({
     status: 'waiting',
     seats: {},
-    comDifficulty: 'normal',
+    comDifficulty: {1:'normal',2:'normal',3:'normal',4:'normal'},
     createdAt: Date.now()
   }).then(()=>{
     G.isHost = true;
@@ -145,16 +145,13 @@ function showLobbyRoom(code){
   db.ref('rooms/'+code+'/seats').on('value', snap=>{
     seatsCache = snap.val() || {};
     renderSeats(seatsCache);
+    renderComDifficultyPanel();
     updateReadyButton();
   });
 
   db.ref('rooms/'+code+'/comDifficulty').on('value', snap=>{
-    comDifficultyCache = snap.val() || 'normal';
-    const sel = document.getElementById('comDifficultySelect');
-    if(sel){
-      sel.disabled = !G.isHost;
-      if(document.activeElement !== sel) sel.value = comDifficultyCache;
-    }
+    comDifficultyCache = snap.val() || {1:'normal',2:'normal',3:'normal',4:'normal'};
+    renderComDifficultyPanel();
   });
 
   db.ref('rooms/'+code+'/status').on('value', snap=>{
@@ -183,10 +180,44 @@ function toggleReady(){
   db.ref('rooms/'+G.roomId+'/seats/'+G.mySeat+'/ready').set(!info.ready);
 }
 
-//CPUの強さはホストのみ変更可能（部屋に保存して全員に配信し、ゲーム開始時にstateへ引き継ぐ）
-function setComDifficulty(v){
+//CPUの強さは席（ロビー番号）ごとに設定。ホストのみ変更可能で、部屋に保存して全員に配信し、
+//ゲーム開始時に色スロットへ変換してstateへ引き継ぐ（3体のCPUがそれぞれ違う強さで動くようにする）
+function setComDifficulty(seat, v){
   if(!G.roomId || !G.isHost) return;
-  db.ref('rooms/'+G.roomId+'/comDifficulty').set(v);
+  db.ref('rooms/'+G.roomId+'/comDifficulty/'+seat).set(v);
+}
+
+//空席（＝ゲーム開始時にCPUになる席）にだけ強さの選択欄を出す
+function renderComDifficultyPanel(){
+  const wrap = document.getElementById('comDifficultyList');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  const DIFF_LABELS = [['easy','弱い'],['normal','ふつう'],['hard','強い']];
+
+  for(let p=1;p<=4;p++){
+    const info = seatsCache[p];
+    const row = document.createElement('div');
+    row.className = 'com-diff-row';
+
+    if(info){
+      row.textContent = 'プレイヤー' + p + '：（人間が操作）';
+    } else {
+      const label = document.createElement('span');
+      label.textContent = 'プレイヤー' + p + '（CPU）';
+      const sel = document.createElement('select');
+      sel.disabled = !G.isHost;
+      for(const [v, text] of DIFF_LABELS){
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = text;
+        if((comDifficultyCache[p] || 'normal') === v) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      sel.addEventListener('change', ()=>{ setComDifficulty(p, sel.value); });
+      row.appendChild(label);
+      row.appendChild(sel);
+    }
+    wrap.appendChild(row);
+  }
 }
 
 function updateReadyButton(){
@@ -226,7 +257,7 @@ function startGame(){
     }
     const seatMap = {};
 
-    const active={}, passed={}, remain={}, first={}, lastPiece={}, names={}, isCOM={};
+    const active={}, passed={}, remain={}, first={}, lastPiece={}, names={}, isCOM={}, comDifficulty={};
     for(let p=1;p<=4;p++){
       const colorSlot = colors[p-1];
       seatMap[p] = colorSlot;
@@ -240,13 +271,14 @@ function startGame(){
       lastPiece[colorSlot] = null;
       names[colorSlot]     = info ? info.name : ('CPU' + colorSlot);
       isCOM[colorSlot]     = isCOMSeat;
+      comDifficulty[colorSlot] = isCOMSeat ? (comDifficultyCache[p] || 'normal') : 'normal';
     }
 
     const board = Array.from({length:SIZE},()=>Array(SIZE).fill(0));
     db.ref('rooms/'+G.roomId+'/state').set({
       board, remain, first, passed, active, cur: 1, lastPiece,
       names, isCOM, seatMap,
-      comDifficulty: comDifficultyCache,
+      comDifficulty,
       turnDeadline: Date.now() + 60000
     });
     db.ref('rooms/'+G.roomId+'/status').set('playing');
@@ -305,7 +337,7 @@ function subscribeGameState(){
     G.names       = s.names || {};
     G.isCOMMap    = s.isCOM || {};
     G.seatMap     = s.seatMap || {};
-    G.comDifficulty = s.comDifficulty || 'normal';
+    G.comDifficulty = s.comDifficulty || {};
     G.turnDeadline = s.turnDeadline || null;
     G.myColor     = (G.mySeat && G.seatMap) ? G.seatMap[G.mySeat] : null;
 
@@ -342,7 +374,7 @@ function syncState(){
     names: G.names || {},
     isCOM: G.isCOMMap || {},
     seatMap: G.seatMap || {},
-    comDifficulty: G.comDifficulty || 'normal',
+    comDifficulty: G.comDifficulty || {},
     turnDeadline: Date.now() + 60000
   });
 }
@@ -1124,7 +1156,7 @@ function findMoveHard(p){
 }
 
 function findAnyValidMove(p){
-  const difficulty = G.comDifficulty || 'normal';
+  const difficulty = (G.comDifficulty && G.comDifficulty[p]) || 'normal';
   if(difficulty === 'easy') return findMoveEasy(p);
   if(difficulty === 'hard') return findMoveHard(p);
   return findMoveNormal(p);

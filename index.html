@@ -39,12 +39,8 @@
     <div id="seatList"></div>
 
     <div id="comDifficultyPanel" class="card">
-      <label for="comDifficultySelect">CPUの強さ：</label>
-      <select id="comDifficultySelect" onchange="setComDifficulty(this.value)">
-        <option value="easy">弱い</option>
-        <option value="normal" selected>ふつう</option>
-        <option value="hard">強い</option>
-      </select>
+      <h3 style="margin:0 0 10px;font-size:15px;color:var(--text-secondary);font-weight:600;">CPUの強さ（空席がCPUになります）</h3>
+      <div id="comDifficultyList"></div>
     </div>
 
     <button id="startBtn" class="game-button-wide" onclick="startGame()" style="display:none;">ゲーム開始</button>
