@@ -445,7 +445,14 @@ function subscribeGameState(){
     if(!s) return;
 
     G.board       = normalizeBoard(s.board);
-    G.remain      = s.remain || G.remain;
+    //FirebaseのRealtime Databaseは空配列[]を保存できず、そのキーごと消えてしまう仕様がある。
+    //ピースを全部置き切ったプレイヤーのremain[p]はちょうど[]になるため、そのまま受け取ると
+    //undefinedになってしまい、以降のallDone判定や結果画面の集計がその人だけ無限に「未終了」
+    //扱いになって結果画面に進めなくなる。ここで必ず配列に正規化しておく。
+    G.remain = s.remain || G.remain;
+    for(let p=1;p<=4;p++){
+      if(!Array.isArray(G.remain[p])) G.remain[p] = [];
+    }
     G.first       = s.first || G.first;
     G.passed      = s.passed || G.passed;
     G.active      = s.active || G.active;
@@ -1135,10 +1142,10 @@ function validCheck() {
 }
 
 function nextTurn(){
-  //誰か1人でも手持ちのピースを1つも余らせず全部置き切ったら、その時点で即ゲーム終了とする
-  //（一度も置けずにパスすることなく最後まで置き切るのは最高の結果であり、他のプレイヤーの決着を待つ必要がないため）
-  const perfectFinish = [1,2,3,4].some(p => G.active[p] && G.remain[p] && G.remain[p].length === 0);
-  const allDone = perfectFinish || [1,2,3,4].every(p=>!G.active[p]||G.passed[p]||(G.remain[p]&&G.remain[p].length===0));
+  //全員が「パス済み」か「手持ちのピースを置き切った」状態になって、初めてゲーム終了とする。
+  //(以前は誰か1人が置き切った時点で即終了させていたが、それだと他のプレイヤーがまだ置ける
+  //　ピースを残したまま強制的に打ち切られてしまうバグになっていたため、本来の判定に戻した)
+  const allDone=[1,2,3,4].every(p=>!G.active[p]||G.passed[p]||(G.remain[p]&&G.remain[p].length===0));
   if(allDone){
     syncState();
     if(G.roomId) db.ref('rooms/'+G.roomId+'/status').set('finished');
@@ -1336,12 +1343,12 @@ function showResult(){
     if(!G.active[p]) continue;
 
     let remainCells = 0;
-    for(const id of G.remain[p]){
+    for(const id of (G.remain[p]||[])){
       remainCells += PDEFS[id].length;
     }
     let score = 89 - remainCells;
 
-    if(G.remain[p].length === 0){
+    if((G.remain[p]||[]).length === 0){
       score += 15;
       if(G.lastPiece[p] === 0){
         score += 5;
@@ -1349,7 +1356,7 @@ function showResult(){
     }
 
     sc[p] = score;
-    placedCount[p] = 21 - G.remain[p].length;
+    placedCount[p] = 21 - (G.remain[p]||[]).length;
   }
 
   const rankOrder = Object.keys(sc).map(Number).sort((a, b) => sc[b] - sc[a]);
