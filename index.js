@@ -49,10 +49,12 @@ const G = {
   roomStatus: null, turnDeadline: null, timeoutTriggered: false,
   openedOpponent: null,
   dragging: false,
+  comDifficulty: 'normal',
 };
 
 let zoom = 1;
 let seatsCache = {};
+let comDifficultyCache = 'normal';
 let lastCur = null;
 let activeDragTouchId = null;
 
@@ -78,6 +80,7 @@ function createRoom(){
   db.ref('rooms/'+code).set({
     status: 'waiting',
     seats: {},
+    comDifficulty: 'normal',
     createdAt: Date.now()
   }).then(()=>{
     G.isHost = true;
@@ -145,6 +148,15 @@ function showLobbyRoom(code){
     updateReadyButton();
   });
 
+  db.ref('rooms/'+code+'/comDifficulty').on('value', snap=>{
+    comDifficultyCache = snap.val() || 'normal';
+    const sel = document.getElementById('comDifficultySelect');
+    if(sel){
+      sel.disabled = !G.isHost;
+      if(document.activeElement !== sel) sel.value = comDifficultyCache;
+    }
+  });
+
   db.ref('rooms/'+code+'/status').on('value', snap=>{
     const st = snap.val();
     G.roomStatus = st;
@@ -169,6 +181,12 @@ function toggleReady(){
   if(!G.roomId || !G.mySeat) return;
   const info = seatsCache[G.mySeat] || {};
   db.ref('rooms/'+G.roomId+'/seats/'+G.mySeat+'/ready').set(!info.ready);
+}
+
+//CPUの強さはホストのみ変更可能（部屋に保存して全員に配信し、ゲーム開始時にstateへ引き継ぐ）
+function setComDifficulty(v){
+  if(!G.roomId || !G.isHost) return;
+  db.ref('rooms/'+G.roomId+'/comDifficulty').set(v);
 }
 
 function updateReadyButton(){
@@ -228,6 +246,7 @@ function startGame(){
     db.ref('rooms/'+G.roomId+'/state').set({
       board, remain, first, passed, active, cur: 1, lastPiece,
       names, isCOM, seatMap,
+      comDifficulty: comDifficultyCache,
       turnDeadline: Date.now() + 60000
     });
     db.ref('rooms/'+G.roomId+'/status').set('playing');
@@ -286,6 +305,7 @@ function subscribeGameState(){
     G.names       = s.names || {};
     G.isCOMMap    = s.isCOM || {};
     G.seatMap     = s.seatMap || {};
+    G.comDifficulty = s.comDifficulty || 'normal';
     G.turnDeadline = s.turnDeadline || null;
     G.myColor     = (G.mySeat && G.seatMap) ? G.seatMap[G.mySeat] : null;
 
@@ -322,6 +342,7 @@ function syncState(){
     names: G.names || {},
     isCOM: G.isCOMMap || {},
     seatMap: G.seatMap || {},
+    comDifficulty: G.comDifficulty || 'normal',
     turnDeadline: Date.now() + 60000
   });
 }
@@ -980,19 +1001,54 @@ function nextTurn(){
 
 function isCOM(p){ return G.isCOMMap && !!G.isCOMMap[p]; }
 
-function findAnyValidMove(p){
-  const sortedRemain = [...G.remain[p]].sort((a, b) => {
-    const sizeA = PDEFS[a].length;
-    const sizeB = PDEFS[b].length;
-    if (sizeB !== sizeA) return sizeB - sizeA;
-    return b - a;
-  });
+function shuffled(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
 
-  for(const id of sortedRemain){
-    for(const flip of [false, true]){
-      for(let rot=0; rot<4; rot++){
-        for(let r=0; r<SIZE; r++){
-          for(let c=0; c<SIZE; c++){
+//あるピースを置いた時に新しく生まれる「自分の色の角（次に置ける起点）」の数を数える。
+//強いCPUが、置いたあとの自分の選択肢を広げる手を選ぶための評価値として使う。
+function countNewCorners(p, pcs){
+  const placedSet = new Set(pcs.map(([r,c])=>r+','+c));
+  const seen = new Set();
+  let count = 0;
+  for(const [r,c] of pcs){
+    for(const [dr,dc] of [[-1,-1],[-1,1],[1,-1],[1,1]]){
+      const nr=r+dr, nc=c+dc;
+      if(nr<0||nr>=SIZE||nc<0||nc>=SIZE) continue;
+      const key = nr+','+nc;
+      if(seen.has(key) || placedSet.has(key)) continue;
+      if(G.board[nr][nc] !== 0) continue;
+      let blocked = false;
+      for(const [ar,ac] of [[nr-1,nc],[nr+1,nc],[nr,nc-1],[nr,nc+1]]){
+        if(ar<0||ar>=SIZE||ac<0||ac>=SIZE) continue;
+        if(placedSet.has(ar+','+ac) || G.board[ar][ac]===p){ blocked = true; break; }
+      }
+      if(blocked) continue;
+      seen.add(key);
+      count++;
+    }
+  }
+  return count;
+}
+
+//弱い：ピースの大きさを無視してランダムな順で試す（大きいピースを温存しがちで弱くなる）
+function findMoveEasy(p){
+  const ids = shuffled(G.remain[p]);
+  const rows = shuffled([...Array(SIZE).keys()]);
+  const cols = shuffled([...Array(SIZE).keys()]);
+  const flips = shuffled([false, true]);
+  const rots = shuffled([0,1,2,3]);
+
+  for(const id of ids){
+    for(const flip of flips){
+      for(const rot of rots){
+        for(const r of rows){
+          for(const c of cols){
             const pcs = getPlaced(r, c, id, rot, flip);
             if(pcs.some(([pr,pc]) => pr<0 || pr>=SIZE || pc<0 || pc>=SIZE)) continue;
             if(isValid(p, pcs)) return {id, rot, r, c, flip};
@@ -1002,6 +1058,76 @@ function findAnyValidMove(p){
     }
   }
   return null;
+}
+
+//ふつう：大きいピース優先の従来ロジックだが、探索順をランダム化して毎回同じ手にならないようにする
+function findMoveNormal(p){
+  const sortedRemain = [...G.remain[p]].sort((a, b) => {
+    const sizeA = PDEFS[a].length;
+    const sizeB = PDEFS[b].length;
+    if (sizeB !== sizeA) return sizeB - sizeA;
+    return Math.random() - 0.5;
+  });
+  const rows = shuffled([...Array(SIZE).keys()]);
+  const cols = shuffled([...Array(SIZE).keys()]);
+  const flips = shuffled([false, true]);
+  const rots = shuffled([0,1,2,3]);
+
+  for(const id of sortedRemain){
+    for(const flip of flips){
+      for(const rot of rots){
+        for(const r of rows){
+          for(const c of cols){
+            const pcs = getPlaced(r, c, id, rot, flip);
+            if(pcs.some(([pr,pc]) => pr<0 || pr>=SIZE || pc<0 || pc>=SIZE)) continue;
+            if(isValid(p, pcs)) return {id, rot, r, c, flip};
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+//強い：置けるピースの中で最大サイズの候補をすべて洗い出し、新しくできる角の数が最も多い手を選ぶ
+//（僅差の候補が複数ある時はその中からランダムに選び、パターンの偏りを防ぐ）
+function findMoveHard(p){
+  const sizes = [...new Set(G.remain[p].map(id => PDEFS[id].length))].sort((a,b)=>b-a);
+
+  for(const size of sizes){
+    const idsOfSize = G.remain[p].filter(id => PDEFS[id].length === size);
+    const candidates = [];
+    for(const id of idsOfSize){
+      for(const flip of [false, true]){
+        for(let rot=0; rot<4; rot++){
+          for(let r=0; r<SIZE; r++){
+            for(let c=0; c<SIZE; c++){
+              const pcs = getPlaced(r, c, id, rot, flip);
+              if(pcs.some(([pr,pc]) => pr<0 || pr>=SIZE || pc<0 || pc>=SIZE)) continue;
+              if(isValid(p, pcs)) candidates.push({id, rot, r, c, flip, pcs});
+            }
+          }
+        }
+      }
+    }
+    if(candidates.length === 0) continue;
+
+    let bestScore = -Infinity;
+    for(const mv of candidates){
+      mv.score = countNewCorners(p, mv.pcs);
+      if(mv.score > bestScore) bestScore = mv.score;
+    }
+    const top = candidates.filter(mv => mv.score >= bestScore - 1);
+    return top[Math.floor(Math.random()*top.length)];
+  }
+  return null;
+}
+
+function findAnyValidMove(p){
+  const difficulty = G.comDifficulty || 'normal';
+  if(difficulty === 'easy') return findMoveEasy(p);
+  if(difficulty === 'hard') return findMoveHard(p);
+  return findMoveNormal(p);
 }
 
 let comRunning = false;

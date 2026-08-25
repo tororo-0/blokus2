@@ -37,6 +37,16 @@
     </div>
 
     <div id="seatList"></div>
+
+    <div id="comDifficultyPanel" class="card">
+      <label for="comDifficultySelect">CPUの強さ：</label>
+      <select id="comDifficultySelect" onchange="setComDifficulty(this.value)">
+        <option value="easy">弱い</option>
+        <option value="normal" selected>ふつう</option>
+        <option value="hard">強い</option>
+      </select>
+    </div>
+
     <button id="startBtn" class="game-button-wide" onclick="startGame()" style="display:none;">ゲーム開始</button>
     <p class="hint">ホストが「ゲーム開始」を押すと、空席には自動でCPUが入り、プレイヤーの色（手番順）はランダムに決まります。</p>
   </div>
