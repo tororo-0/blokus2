@@ -31,8 +31,9 @@ const PDEFS   = [
   [[0,3],[1,3],[1,2],[1,1],[1,0]],
 ];
 
-//mySeat    : ロビーでの参加順（1〜4）。名前や準備状態はこの番号にひもづく
-//myColor   : ゲーム開始後に割り振られる実際のピースの色（1〜4）。mySeatとは別物
+//mySeats   : この端末が担当するロビー番号（1〜4）の配列。1台で複数人が交代プレイする場合は複数入る
+//myColor   : 「今の手番の色が、自分の担当席のものであれば」その色になる（そうでなければnull）。
+//            毎ターン計算し直すことで、複数席を担当していても手番が来た席だけ操作できるようにする
 //names     : 色スロットごとの表示名（{1:'たろう', 2:'CPU2', ...}）
 //isCOMMap  : 色スロットごとにCPUかどうか
 const G = {
@@ -43,7 +44,7 @@ const G = {
   active: {1:false,2:false,3:false,4:false},
   cur: 1, selId: null, rot: 0, hoverR: -1, hoverC: -1, flip:false,
   lastPiece: {1:null, 2:null, 3:null, 4:null},
-  roomId: null, mySeat: null, myColor: null, isHost: false,
+  roomId: null, mySeats: [], myColor: null, isHost: false,
   pendingMove: null,
   names: {}, isCOMMap: {}, seatMap: {},
   roomStatus: null, turnDeadline: null, timeoutTriggered: false,
@@ -55,6 +56,8 @@ const G = {
 let zoom = 1;
 let seatsCache = {};
 let comDifficultyCache = {1:'normal',2:'normal',3:'normal',4:'normal'}; //ロビー番号(1〜4) → 強さ
+let cpuNamesCache = {}; //ロビー番号(1〜4) → CPUの表示名（空席のみ有効）
+let manualColorsCache = {}; //ロビー番号(1〜4) → 色スロット(1〜4)。各自で選ぶか「ランダムに決める」ボタンで一括設定する
 let lastCur = null;
 let activeDragTouchId = null;
 
@@ -63,7 +66,7 @@ let activeDragTouchId = null;
 //それによる「二重プレビュー」を防ぐためのフラグ。
 let isTouchDevice = false;
 document.addEventListener('touchstart', ()=>{ isTouchDevice = true; }, { passive:true, capture:true });
-
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
 /* =========================================================
    ロビー機能（部屋の作成・参加は「先着で番号が決まる」方式）
    ========================================================= */
@@ -75,16 +78,25 @@ function genCode(){
   return s;
 }
 
+function getLocalSeatCount(){
+  const sel = document.getElementById('localCountSelect');
+  const v = sel ? parseInt(sel.value, 10) : 1;
+  return Math.max(1, Math.min(4, v || 1));
+}
+
 function createRoom(){
   const code = genCode();
+  const seatCount = getLocalSeatCount();
   db.ref('rooms/'+code).set({
     status: 'waiting',
     seats: {},
     comDifficulty: {1:'normal',2:'normal',3:'normal',4:'normal'},
+    cpuNames: {},
+    manualColors: {},
     createdAt: Date.now()
   }).then(()=>{
     G.isHost = true;
-    enterRoom(code);
+    enterRoom(code, seatCount);
   }).catch(e=>{
     document.getElementById('lobbyMsg').textContent = '部屋の作成に失敗しました: ' + e.message;
   });
@@ -93,45 +105,48 @@ function createRoom(){
 function joinRoomFromInput(){
   const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
   if(!code){ return; }
+  const seatCount = getLocalSeatCount();
   db.ref('rooms/'+code).get().then(snap=>{
     if(!snap.exists()){
       document.getElementById('lobbyMsg').textContent = 'その部屋コードは見つかりませんでした';
       return;
     }
     G.isHost = false;
-    enterRoom(code);
+    enterRoom(code, seatCount);
   }).catch(e=>{
     document.getElementById('lobbyMsg').textContent = '接続に失敗しました: ' + e.message;
   });
 }
 
-//席は「早い者勝ち」で1〜4番が自動的に割り当てられる（トランザクションで同時参加の衝突を防ぐ）
-function enterRoom(code){
+//席は「早い者勝ち」で1〜4番が自動的に割り当てられる（トランザクションで同時参加の衝突を防ぐ）。
+//1台のスマホを友達と回して遊ぶ場合はseatCountを2以上にして、その端末がまとめて複数席を担当する。
+function enterRoom(code, seatCount){
+  seatCount = Math.max(1, Math.min(4, seatCount || 1));
   G.roomId = code;
   const seatsRef = db.ref('rooms/'+code+'/seats');
-  let claimed = undefined;
+  let claimed = [];
 
   seatsRef.transaction(seats=>{
     seats = seats || {};
-    claimed = null;
-    for(let p=1;p<=4;p++){
-      if(!seats[p]){
-        seats[p] = {name:'プレイヤー'+p, ready:false};
-        claimed = p;
-        return seats;
-      }
+    claimed = [];
+    for(let p=1; p<=4 && claimed.length<seatCount; p++){
+      if(!seats[p]) claimed.push(p);
     }
-    return seats; //空きなし＝満室
+    if(claimed.length < seatCount) return; //空きが足りない→中断（committed=false）
+    for(const p of claimed){
+      seats[p] = {name:'プレイヤー'+p, ready:false};
+    }
+    return seats;
   }, (err, committed)=>{
-    if(err || !committed){
+    if(err){
       document.getElementById('lobbyMsg').textContent = '参加に失敗しました。もう一度お試しください';
       return;
     }
-    if(claimed === null){
-      document.getElementById('lobbyMsg').textContent = 'この部屋は満員です（最大4人）';
+    if(!committed){
+      document.getElementById('lobbyMsg').textContent = '空席が足りません（残り席を確認してください）';
       return;
     }
-    G.mySeat = claimed;
+    G.mySeats = claimed;
     showLobbyRoom(code);
   });
 }
@@ -140,18 +155,28 @@ function showLobbyRoom(code){
   document.getElementById('lobby-entry').style.display = 'none';
   document.getElementById('lobby-room').style.display = 'block';
   document.getElementById('roomCodeDisplay').textContent = code;
-  document.getElementById('myNameInput').value = 'プレイヤー'+G.mySeat;
+
+  const btnWrap = document.getElementById('randomColorBtnWrap');
+  if(btnWrap) btnWrap.style.display = G.isHost ? 'block' : 'none';
 
   db.ref('rooms/'+code+'/seats').on('value', snap=>{
     seatsCache = snap.val() || {};
-    renderSeats(seatsCache);
-    renderComDifficultyPanel();
-    updateReadyButton();
+    renderPlayerList();
   });
 
   db.ref('rooms/'+code+'/comDifficulty').on('value', snap=>{
     comDifficultyCache = snap.val() || {1:'normal',2:'normal',3:'normal',4:'normal'};
-    renderComDifficultyPanel();
+    renderPlayerList();
+  });
+
+  db.ref('rooms/'+code+'/cpuNames').on('value', snap=>{
+    cpuNamesCache = snap.val() || {};
+    renderPlayerList();
+  });
+
+  db.ref('rooms/'+code+'/manualColors').on('value', snap=>{
+    manualColorsCache = snap.val() || {};
+    renderPlayerList();
   });
 
   db.ref('rooms/'+code+'/status').on('value', snap=>{
@@ -167,43 +192,101 @@ function showLobbyRoom(code){
   });
 }
 
-function saveMyName(){
-  if(!G.roomId || !G.mySeat) return;
-  const raw = document.getElementById('myNameInput').value.trim().slice(0,10);
-  const val = raw || ('プレイヤー'+G.mySeat);
-  db.ref('rooms/'+G.roomId+'/seats/'+G.mySeat+'/name').set(val);
+function saveMyName(seat, rawValue){
+  if(!G.roomId || !G.mySeats.includes(seat)) return;
+  const raw = (rawValue || '').trim().slice(0,10);
+  const val = raw || ('プレイヤー'+seat);
+  db.ref('rooms/'+G.roomId+'/seats/'+seat+'/name').set(val);
 }
 
-function toggleReady(){
-  if(!G.roomId || !G.mySeat) return;
-  const info = seatsCache[G.mySeat] || {};
-  db.ref('rooms/'+G.roomId+'/seats/'+G.mySeat+'/ready').set(!info.ready);
+function toggleSeatReady(seat){
+  if(!G.roomId || !G.mySeats.includes(seat)) return;
+  const info = seatsCache[seat] || {};
+  db.ref('rooms/'+G.roomId+'/seats/'+seat+'/ready').set(!info.ready);
 }
 
-//CPUの強さは席（ロビー番号）ごとに設定。ホストのみ変更可能で、部屋に保存して全員に配信し、
-//ゲーム開始時に色スロットへ変換してstateへ引き継ぐ（3体のCPUがそれぞれ違う強さで動くようにする）
+//CPUの強さ・名前は席（ロビー番号）ごとに設定。ホストのみ変更可能で、部屋に保存して全員に配信し、
+//ゲーム開始時に色スロットへ変換してstateへ引き継ぐ（3体のCPUがそれぞれ違う強さ・名前で動くようにする）
 function setComDifficulty(seat, v){
   if(!G.roomId || !G.isHost) return;
   db.ref('rooms/'+G.roomId+'/comDifficulty/'+seat).set(v);
 }
 
-//空席（＝ゲーム開始時にCPUになる席）にだけ強さの選択欄を出す
-function renderComDifficultyPanel(){
-  const wrap = document.getElementById('comDifficultyList');
+function setCpuName(seat, v){
+  if(!G.roomId || !G.isHost) return;
+  const raw = (v || '').trim().slice(0,10);
+  db.ref('rooms/'+G.roomId+'/cpuNames/'+seat).set(raw);
+}
+
+function setManualColor(seat, colorSlot){
+  if(!G.roomId || !G.isHost) return;
+  if(colorSlot){
+    db.ref('rooms/'+G.roomId+'/manualColors/'+seat).set(colorSlot);
+  } else {
+    db.ref('rooms/'+G.roomId+'/manualColors/'+seat).remove();
+  }
+}
+
+//ホストが色の組み合わせをその場でランダムに決めて、全員のロビー画面（各行の色欄）に反映する。
+//決めた後も各行の選択欄で個別に選び直せる。何も決めずにゲーム開始した場合はstartGame側で自動的にランダム決定される
+function rollRandomColors(){
+  if(!G.roomId || !G.isHost) return;
+  const colors = [1,2,3,4];
+  for(let i=colors.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [colors[i],colors[j]] = [colors[j],colors[i]];
+  }
+  const obj = {};
+  for(let p=1;p<=4;p++) obj[p] = colors[p-1];
+  db.ref('rooms/'+G.roomId+'/manualColors').set(obj);
+}
+
+const COLOR_NAMES = ['', '赤', '青', '緑', '黄'];
+const DIFF_LABELS = [['easy','弱い'],['normal','ふつう'],['hard','強い']];
+
+//プレイヤー1〜4を1行ずつ表示し、名前・CPUの強さ・準備状態・色をまとめて操作できるようにする
+function renderPlayerList(){
+  const wrap = document.getElementById('playerList');
   if(!wrap) return;
   wrap.innerHTML = '';
-  const DIFF_LABELS = [['easy','弱い'],['normal','ふつう'],['hard','強い']];
 
   for(let p=1;p<=4;p++){
     const info = seatsCache[p];
+    const mine = G.mySeats.includes(p);
     const row = document.createElement('div');
-    row.className = 'com-diff-row';
+    row.className = 'player-row' + (mine ? ' mine' : '') + (!info ? ' empty' : '');
 
+    const label = document.createElement('span');
+    label.className = 'player-row-label';
+    label.textContent = 'プレイヤー' + p;
+    row.appendChild(label);
+
+    //名前：人間が座っていれば本人だけ編集可、空席ならホストがCPUの名前を編集可
     if(info){
-      row.textContent = 'プレイヤー' + p + '：（人間が操作）';
+      if(mine){
+        const input = document.createElement('input');
+        input.maxLength = 10;
+        input.value = info.name;
+        input.addEventListener('change', ()=>{ saveMyName(p, input.value); });
+        row.appendChild(input);
+      } else {
+        const span = document.createElement('span');
+        span.className = 'player-row-name';
+        span.textContent = info.name;
+        row.appendChild(span);
+      }
     } else {
-      const label = document.createElement('span');
-      label.textContent = 'プレイヤー' + p + '（CPU）';
+      const nameInput = document.createElement('input');
+      nameInput.maxLength = 10;
+      nameInput.placeholder = 'CPU' + p;
+      nameInput.value = cpuNamesCache[p] || '';
+      nameInput.disabled = !G.isHost;
+      nameInput.addEventListener('change', ()=>{ setCpuName(p, nameInput.value); });
+      row.appendChild(nameInput);
+    }
+
+    //CPUの強さ（空席のみ）
+    if(!info){
       const sel = document.createElement('select');
       sel.disabled = !G.isHost;
       for(const [v, text] of DIFF_LABELS){
@@ -213,54 +296,88 @@ function renderComDifficultyPanel(){
         sel.appendChild(opt);
       }
       sel.addEventListener('change', ()=>{ setComDifficulty(p, sel.value); });
-      row.appendChild(label);
       row.appendChild(sel);
     }
-    wrap.appendChild(row);
-  }
-}
 
-function updateReadyButton(){
-  const info = seatsCache[G.mySeat];
-  const btn = document.getElementById('readyBtn');
-  if(!btn || !info) return;
-  btn.textContent = info.ready ? '準備を取り消す' : '準備OK';
-}
-
-function renderSeats(seats){
-  const wrap = document.getElementById('seatList');
-  wrap.innerHTML = '';
-  for(let p=1;p<=4;p++){
-    const info = seats[p];
-    const row = document.createElement('div');
-    row.className = 'seat-row' + (G.mySeat===p ? ' mine' : '') + (!info ? ' empty' : '');
+    //準備状態：自分の席だけボタンで切り替え、他人の席やCPU席は状態表示のみ
     if(info){
-      row.textContent = 'プレイヤー' + p + '： ' + info.name + (info.ready ? '（準備OK）' : '（準備中）') + (G.mySeat===p ? '（あなた）' : '');
+      if(mine){
+        const btn = document.createElement('button');
+        btn.className = 'ready-btn';
+        btn.textContent = info.ready ? '準備を取り消す' : '準備OK';
+        btn.addEventListener('click', ()=>toggleSeatReady(p));
+        row.appendChild(btn);
+      } else {
+        const span = document.createElement('span');
+        span.className = 'player-row-status';
+        span.textContent = info.ready ? '準備OK' : '準備中';
+        row.appendChild(span);
+      }
     } else {
-      row.textContent = 'プレイヤー' + p + '：（空席・ゲーム開始時にCPUが入ります）';
+      const span = document.createElement('span');
+      span.className = 'player-row-status';
+      span.textContent = 'CPU';
+      row.appendChild(span);
     }
+
+    //色：席ごとに選択欄を出す（デフォルトは自分で選ぶ前提。右下の「ランダムに決める」ボタンで一括設定も可能）
+    {
+      const sel = document.createElement('select');
+      sel.disabled = !G.isHost;
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = ''; emptyOpt.textContent = '未設定';
+      sel.appendChild(emptyOpt);
+      const usedColors = Object.values(manualColorsCache).map(Number);
+      for(let cslot=1; cslot<=4; cslot++){
+        const opt = document.createElement('option');
+        opt.value = cslot;
+        opt.textContent = COLOR_NAMES[cslot];
+        //他の席が既に使っている色は選べないようにする（自分に割り当て済みの色は選択可のまま）
+        opt.disabled = usedColors.includes(cslot) && Number(manualColorsCache[p]) !== cslot;
+        if(Number(manualColorsCache[p]) === cslot) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      sel.addEventListener('change', ()=>{
+        setManualColor(p, sel.value ? parseInt(sel.value,10) : null);
+      });
+      row.appendChild(sel);
+    }
+
     wrap.appendChild(row);
   }
+
   document.getElementById('startBtn').style.display = G.isHost ? '' : 'none';
 }
 
-//ゲーム開始：空席はCPUで自動補完し、色（手番順）はランダムに割り当てる
+//ロビー番号(1〜4)→色スロット(1〜4)の対応表を作る。
+//手動設定が全席分そろっていればそれを使い、そうでなければランダムに割り当てる
+function buildSeatMap(){
+  const usedSet = new Set(Object.values(manualColorsCache).map(Number));
+  const isComplete = usedSet.size === 4 && [1,2,3,4].every(c=>usedSet.has(c));
+  if(isComplete){
+    const seatMap = {};
+    for(let p=1;p<=4;p++) seatMap[p] = Number(manualColorsCache[p]);
+    return seatMap;
+  }
+  const colors = [1,2,3,4];
+  for(let i=colors.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [colors[i],colors[j]] = [colors[j],colors[i]];
+  }
+  const seatMap = {};
+  for(let p=1;p<=4;p++) seatMap[p] = colors[p-1];
+  return seatMap;
+}
+
+//ゲーム開始：空席はCPUで自動補完し、色（手番順）は設定に応じてランダムまたは手動で割り当てる
 function startGame(){
   db.ref('rooms/'+G.roomId+'/seats').get().then(snap=>{
     const seats = snap.val() || {};
-
-    //1〜4をシャッフルして「ロビー番号→色スロット」の対応表を作る
-    const colors = [1,2,3,4];
-    for(let i=colors.length-1;i>0;i--){
-      const j = Math.floor(Math.random()*(i+1));
-      [colors[i],colors[j]] = [colors[j],colors[i]];
-    }
-    const seatMap = {};
+    const seatMap = buildSeatMap();
 
     const active={}, passed={}, remain={}, first={}, lastPiece={}, names={}, isCOM={}, comDifficulty={};
     for(let p=1;p<=4;p++){
-      const colorSlot = colors[p-1];
-      seatMap[p] = colorSlot;
+      const colorSlot = seatMap[p];
       const info = seats[p];
       const isCOMSeat = !info;
 
@@ -269,7 +386,7 @@ function startGame(){
       remain[colorSlot]    = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];
       first[colorSlot]     = true;
       lastPiece[colorSlot] = null;
-      names[colorSlot]     = info ? info.name : ('CPU' + colorSlot);
+      names[colorSlot]     = info ? info.name : (cpuNamesCache[p] || ('CPU' + colorSlot));
       isCOM[colorSlot]     = isCOMSeat;
       comDifficulty[colorSlot] = isCOMSeat ? (comDifficultyCache[p] || 'normal') : 'normal';
     }
@@ -337,17 +454,26 @@ function subscribeGameState(){
     G.names       = s.names || {};
     G.isCOMMap    = s.isCOM || {};
     G.seatMap     = s.seatMap || {};
-    G.comDifficulty = s.comDifficulty || {};
-    G.turnDeadline = s.turnDeadline || null;
-    G.myColor     = (G.mySeat && G.seatMap) ? G.seatMap[G.mySeat] : null;
+    //自分の担当席（複数の場合あり）の色一覧を求め、「今の手番がその中のどれかなら」自分の番として扱う。
+    //1台で複数席を担当していても、手番が来た席のピースだけ操作できるようにするための判定。
+    const myColorSlots = G.seatMap ? G.mySeats.map(p=>G.seatMap[p]).filter(Boolean) : [];
+    G.myColor = myColorSlots.includes(G.cur) ? G.cur : null;
 
     G.pendingMove = null;
     G.selId = null; G.rot = 0; G.flip = false; G.hoverR = -1; G.hoverC = -1;
 
     const seatEl = document.getElementById('myseatLabel');
-    const myName = G.myColor ? (G.names[G.myColor] || NAMES[G.myColor]) : null;
-    seatEl.textContent = myName ? '（あなた: ' + myName + '）' : '（観戦中）';
-    seatEl.style.color = G.myColor ? COLORS[G.myColor] : '';
+    if(G.myColor){
+      const myName = G.names[G.myColor] || NAMES[G.myColor];
+      seatEl.textContent = '（あなた: ' + myName + '）';
+      seatEl.style.color = COLORS[G.myColor];
+    } else if(myColorSlots.length > 0){
+      seatEl.textContent = '（他のプレイヤーの番です）';
+      seatEl.style.color = '';
+    } else {
+      seatEl.textContent = '（観戦中）';
+      seatEl.style.color = '';
+    }
 
     if(G.cur !== lastCur){
       showTurnAnnounce(G.names[G.cur] || NAMES[G.cur]);

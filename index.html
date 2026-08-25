@@ -14,12 +14,22 @@
   <h1>Blokus オンライン対戦</h1>
 
   <div id="lobby-entry" class="card">
+    <div class="join-row" style="margin-top:0;">
+      <label for="localCountSelect" style="flex-shrink:0;color:var(--text-secondary);font-size:14px;">この端末でのプレイ人数：</label>
+      <select id="localCountSelect">
+        <option value="1" selected>1人</option>
+        <option value="2">2人（友達と1台で対戦）</option>
+        <option value="3">3人（友達と1台で対戦）</option>
+        <option value="4">4人（友達と1台で対戦）</option>
+      </select>
+    </div>
     <button class="game-button-wide" onclick="createRoom()">部屋を作る</button>
     <div class="join-row">
       <input id="roomCodeInput" placeholder="部屋コード" maxlength="5">
       <button class="game-button-wide" onclick="joinRoomFromInput()">参加する</button>
     </div>
     <p id="lobbyMsg"></p>
+    <p class="hint">同じ場所にいる友達と1台のスマホで遊ぶ場合は人数を選んでください。別の端末からオンラインの友達も同じ部屋コードで参加できます。</p>
   </div>
 
   <div id="lobby-room" style="display:none;">
@@ -29,22 +39,14 @@
       <span id="copyMsg"></span>
     </div>
 
-    <div id="mySeatPanel">
-      <label>あなたの名前：</label>
-      <input id="myNameInput" maxlength="10">
-      <button onclick="saveMyName()">保存</button>
-      <button id="readyBtn" onclick="toggleReady()">準備OK</button>
-    </div>
+    <div id="playerList"></div>
 
-    <div id="seatList"></div>
-
-    <div id="comDifficultyPanel" class="card">
-      <h3 style="margin:0 0 10px;font-size:15px;color:var(--text-secondary);font-weight:600;">CPUの強さ（空席がCPUになります）</h3>
-      <div id="comDifficultyList"></div>
+    <div id="randomColorBtnWrap" style="display:none;">
+      <button id="randomColorBtn" onclick="rollRandomColors()">🎲 色をランダムに決める</button>
     </div>
 
     <button id="startBtn" class="game-button-wide" onclick="startGame()" style="display:none;">ゲーム開始</button>
-    <p class="hint">ホストが「ゲーム開始」を押すと、空席には自動でCPUが入り、プレイヤーの色（手番順）はランダムに決まります。</p>
+    <p class="hint">名前・CPUの強さ・準備状態・色は各プレイヤーの行でまとめて設定できます。ホストが「ゲーム開始」を押すと、空席には自動でCPUが入ります。</p>
   </div>
 </div>
 
