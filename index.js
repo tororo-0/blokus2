@@ -1325,7 +1325,7 @@ function maybeRunCOM(){
     if(idx!==-1) G.remain[G.cur].splice(idx,1);
     G.lastPiece[G.cur]=move.id;
     nextTurn();
-  }, 900);
+  }, 1900);
 }
 
 /* =========================================================
