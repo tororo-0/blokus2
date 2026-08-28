@@ -1047,6 +1047,7 @@ function render(){
   renderBoard();
   renderPieces();
   renderOpponentBar();
+  renderLiveScores();
   renderOpponentPieces();
 }
 
@@ -1335,36 +1336,67 @@ function maybeRunCOM(){
 //色スロット(1〜4)に対応する絵文字。結果画面で「誰が何色だったか」を分かりやすくするため
 const COLOR_EMOJI = { 1:'🔴', 2:'🔵', 3:'🟢', 4:'🟡' };
 
+//ある色の現在の得点内訳。対戦中の速報表示と結果画面で共通利用する
+//21ピースの合計マス数は89。基本点＝置いたマス数、全消しで+15、さらに最後が1マスピースなら+5
+function computeScore(p){
+  let remainCells = 0;
+  for(const id of (G.remain[p]||[])){
+    remainCells += PDEFS[id].length;
+  }
+  const allPlaced = (G.remain[p]||[]).length === 0;
+  const monominoLast = allPlaced && G.lastPiece[p] === 0;
+  let score = 89 - remainCells;
+  if(allPlaced) score += 15;
+  if(monominoLast) score += 5;
+  return { score, placedCount: 21 - (G.remain[p]||[]).length, allPlaced, monominoLast };
+}
+
+//対戦中の得点速報（相手の残りピース表示ボタンの下）
+function renderLiveScores(){
+  const el = document.getElementById('liveScoreBar');
+  if(!el) return;
+  el.innerHTML = '';
+  for(let p = 1; p <= 4; p++){
+    if(!G.active[p]) continue;
+    const r = computeScore(p);
+    const item = document.createElement('div');
+    item.className = 'live-score' + (p === G.cur ? ' current' : '');
+    const dot = document.createElement('span');
+    dot.className = 'live-score-dot';
+    dot.style.background = COLORS[p];
+    const label = document.createElement('span');
+    label.textContent = `${(G.names[p] || NAMES[p]).slice(0,5)} ${r.score}`;
+    item.appendChild(dot);
+    item.appendChild(label);
+    el.appendChild(item);
+  }
+}
+
 function showResult(){
   const sc = {};
   const placedCount = {};
+  const info = {};
 
   for(let p = 1; p <= 4; p++){
     if(!G.active[p]) continue;
-
-    let remainCells = 0;
-    for(const id of (G.remain[p]||[])){
-      remainCells += PDEFS[id].length;
-    }
-    let score = 89 - remainCells;
-
-    if((G.remain[p]||[]).length === 0){
-      score += 15;
-      if(G.lastPiece[p] === 0){
-        score += 5;
-      }
-    }
-
-    sc[p] = score;
-    placedCount[p] = 21 - (G.remain[p]||[]).length;
+    const r = computeScore(p);
+    sc[p] = r.score;
+    placedCount[p] = r.placedCount;
+    info[p] = r;
   }
 
   const rankOrder = Object.keys(sc).map(Number).sort((a, b) => sc[b] - sc[a]);
 
+  //同点は同順位（標準競技順位）。次の順位は人数分だけ飛ぶ（例: 1位が2人なら次は3位）
+  const rankOf = {};
+  rankOrder.forEach(p => {
+    rankOf[p] = 1 + rankOrder.filter(q => sc[q] > sc[p]).length;
+  });
+
   const listEl = document.getElementById('resultRanking');
   listEl.innerHTML = '';
-  rankOrder.forEach((p, idx) => {
-    const rank = idx + 1;
+  rankOrder.forEach((p) => {
+    const rank = rankOf[p];
     const badge = (rank === 1) ? '🥇' : (rank === 2) ? '🥈' : (rank === 3) ? '🥉' : (rank + '位');
     const nm = G.names[p] || NAMES[p];
     const colorEmoji = COLOR_EMOJI[p] || '';
@@ -1379,6 +1411,14 @@ function showResult(){
 
     row.appendChild(line1);
     row.appendChild(line2);
+
+    if(info[p] && info[p].monominoLast){
+      const note = document.createElement('div');
+      note.className = 'result-note';
+      note.textContent = '※1マスピースを最後に置いたので +5点';
+      row.appendChild(note);
+    }
+
     listEl.appendChild(row);
   });
 
