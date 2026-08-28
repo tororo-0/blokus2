@@ -997,9 +997,11 @@ function renderOpponentBar(){
   for(let p=1;p<=4;p++){
     if(!G.active[p]) continue;
     const btn = document.createElement('button');
-    btn.className = 'opp-btn' + (G.openedOpponent===p ? ' open' : '');
-    btn.style.borderColor = COLORS[p];
-    if(G.openedOpponent===p) btn.style.background = COLORS[p] + '33';
+    //置ける場所がなくなって自動パス（脱落）したプレイヤーはボタンをうすいグレーにする。押下は可能
+    const dropped = !!G.passed[p];
+    btn.className = 'opp-btn' + (G.openedOpponent===p ? ' open' : '') + (dropped ? ' dropped' : '');
+    btn.style.borderColor = dropped ? '' : COLORS[p];
+    if(G.openedOpponent===p) btn.style.background = dropped ? '' : (COLORS[p] + '33');
     const nm = (G.names[p] || NAMES[p]);
     btn.textContent = nm.slice(0,5);
     btn.addEventListener('click', ()=>{

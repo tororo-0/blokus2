@@ -464,6 +464,8 @@ button { touch-action: manipulation; }
    white-space: nowrap;
 }
 .opp-btn.open { box-shadow: inset 0 0 0 2px currentColor; }
+.opp-btn.dropped { color: #b8b8bd; background: #f0f0f2; box-shadow: none; }
+.opp-btn.dropped.open { box-shadow: inset 0 0 0 2px #c7c7cc; }
 
 /* ===== 対戦中の得点速報 ===== */
 #liveScoreBar {
